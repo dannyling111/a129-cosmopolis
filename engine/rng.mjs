@@ -2,6 +2,16 @@
 // 🎲 rng.mjs —— 稳定随机(整座城的唯一随机源)
 // 规矩:一切随机由 (seed, 用途字符串) 决定 —— 同一个种子永远长出同一座城,
 // 换种子才是另一座城。绝不用 Math.random(),否则每次刷新都变、没法复算也没法验收。
+//
+// 🔴 撞衫说明(为什么不 import 仓库里现成的那份):
+//   A129 里已经有一份 PRNG 真源 —— storyforge/src/story-engine.js 的 makeRng/hashSeed,
+//   talkforge/src/core/rng.js 就是薄壳包着它。理想情况我该直接 import 它。
+//   不这么做的唯一原因是【交付形态】:CosmoPolis 同时活在两个仓库里 ——
+//   A129 的 web/terminal/cosmopolis/,以及独立仓库 dannyling111/a129-cosmopolis(GitHub Pages 直接发根目录)。
+//   独立仓库里没有 storyforge,跨仓库 import 会让线上页面当场白屏。
+//   所以这里保留一份 40 行的本地实现,并反过来把整台引擎封装成 capsule(engine/index.mjs),
+//   让【别人 import cosmopolis】,而不是 cosmopolis 去 import 别人 —— 复用方向反过来走。
+//   代价是这一份 mulberry32 与 storyforge 那份是两条独立的数列,两边的种子不可互换。
 // ============================================================
 
 /** 把任意字符串折成一个 32 位整数(同样的字符串永远同样的数) */
