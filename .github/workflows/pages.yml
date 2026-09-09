@@ -48,9 +48,10 @@ jobs:
           test -f _site/index.html && test -f _site/studio.html
           test -f _site/engine/index.mjs && test -f _site/vendor/three.module.js
           echo "将要发布的文件数: $(find _site -type f | wc -l)"
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true     # 🔴 关键:Pages 没开通时自己开通,并配置成用 Actions 构建
+      # 🔴 不调 actions/configure-pages:实测它在这个仓库上 GET Pages 站点报 404、
+      #    CREATE 又报「Resource not accessible by integration」——工作流令牌开不了这个口子。
+      #    但 Pages 本身是开着的(线上一直能打开首页),所以直接上传产物 + 部署即可,
+      #    configure-pages 本来就只在需要 Jekyll/base-path 或需要现开通时才必需。
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
