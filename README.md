@@ -4,7 +4,7 @@ A129 独立仓库网页：热带客厅、巴黎咖啡、纽约烘焙，切进同
 
 ## 线上地址
 
-- 玩偶屋（这一版）：https://dannyling111.github.io/a129-cosmopolis/
+- 玩偶屋（可爱三维版）：https://dannyling111.github.io/a129-cosmopolis/
 - 仓库：https://github.com/dannyling111/a129-cosmopolis
 
-拖曳环绕，滚轮拉近，点房间看内部，双击进入。可换城市皮肤、昼夜、层数开间，点「量化重组」换一座楼。
+拖曳环绕，滚轮拉近，点房间看内部，双击进入。默认开场是巴黎公寓 · 种子 ALFAMA-80。可换城市皮肤、昼夜、层数开间，点「量化重组」换一座楼。
