@@ -63,7 +63,9 @@ export function assemble(o = {}) {
     for (let b = 0; b < bays; b++) {
       const w = bayW[b];
       const prev = rooms.length ? rooms[rooms.length - 1].fn : null;
-      let cands = pool.filter(f => !prev || !AVOID.has(pairKey(prev, f.id)));
+      // noSameNeighbor:同一个功能不许紧挨自己(指引开篇批评的「像复制粘贴」)
+      let cands = pool.filter(f => !prev || (!AVOID.has(pairKey(prev, f.id)) &&
+                                             !(ADJACENCY.noSameNeighbor && f.id === prev)));
       if (!cands.length) cands = pool.slice();
       // 层带的对外比例:地面层至少三分之二临街对外
       const needPublic = (rule.publicMin || 0) > 0 &&
@@ -129,8 +131,11 @@ export function auditCity(b) {
       if (!(BY_ID[r.fn].bands || []).includes(f.band)) bad.push(`L${f.level} 的 ${r.cn} 不该出现在 ${f.band} 层带`);
       if (!(rule.fams || []).includes(r.fam)) bad.push(`L${f.level} 的 ${r.cn} 属 ${r.fam} 族,不在该层带允许的族里`);
       if (i > 0) {
-        const k = pairKey(f.rooms[i - 1].fn, r.fn);
-        if (AVOID.has(k)) bad.push(`L${f.level}: ${f.rooms[i - 1].cn} 不该紧挨 ${r.cn}`);
+        const prevFn = f.rooms[i - 1].fn;
+        if (AVOID.has(pairKey(prevFn, r.fn))) bad.push(`L${f.level}: ${f.rooms[i - 1].cn} 不该紧挨 ${r.cn}`);
+        // 指引开篇批评的就是「同一功能的房间看起来像复制粘贴」——所以两间一样的并排本身就算违规
+        if (ADJACENCY.noSameNeighbor && prevFn === r.fn)
+          bad.push(`L${f.level}: 两间${r.cn}并排(同一功能紧挨自己 = 指引说的「像复制粘贴」)`);
       }
     });
     if (rule.publicMin > 0) {

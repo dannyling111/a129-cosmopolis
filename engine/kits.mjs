@@ -49,6 +49,10 @@
 // ---------------------------------------------------------------------------
 // 12 大类：id、中文名与顺序严格照抄 SCHEMA §0.2（工作指引原表）
 // ---------------------------------------------------------------------------
+// 🔴 2026-09-09 独立验收发现并修:plant 少了 'main'、textile 少了 'path',
+//    而 functions.mjs 里有 10 条区域程序正好声明了这两格(花店/温室/屋顶花园的主区绿植、儿童房/游戏室通行的软垫)。
+//    后果不是报错,是【静默蒸发】——240 间房被跳过 379 件套件(12.6%),温室主区一棵植物都没有,
+//    而当时没有任何判据在看这个数。现在:天花板补上,并且体检里加了一条"声明了天花板不允许的组合=判红"。
 export const KIT_CATS = [
   { id:'seat', cn:'座具', desc:'把人接住的零件：沙发/贵妃榻/扶手椅/餐椅/吧凳/长凳/蒲团/摇椅/办公椅，所有“坐”的事件都从它的口袋里长出来',
     zones:['main','aux','window'], floor:true },
@@ -72,10 +76,10 @@ export const KIT_CATS = [
     zones:['main','aux','window','walldec'], floor:true },
 
   { id:'textile', cn:'织物', desc:'布与毛的那一层：地毯/帘/靠垫/披毯/床品/帐/桌布/挂旗/垫/纱，负责把硬房间变软',
-    zones:['main','aux','window','walldec'], floor:true },
+    zones:['main', 'aux', 'window', 'walldec', 'path'], floor:true },
 
   { id:'plant', cn:'绿植', desc:'活的那一层：高株/灌木/垂盆/窗箱/花瓶/香草盆/小树/苔墙/多肉盘/花环，靠窗、沿通行边、也可上墙',
-    zones:['window','path','aux','walldec'], floor:true },
+    zones:['window', 'path', 'aux', 'walldec', 'main'], floor:true },
 
   { id:'media', cn:'媒介', desc:'承载信息或图像的面与机器：电视/唱机/音箱/投影/画/照片墙/钟/镜/灯牌/黑板，专业机具（台锯/缝纫机/放大机/街机）同族',
     zones:['main','aux','walldec'], floor:true },
@@ -90,6 +94,10 @@ export const KIT_CATS = [
 // ---------------------------------------------------------------------------
 // 零件库：前 11 类是可落地零件，第 12 类 person 是动作（形状不同）
 // ---------------------------------------------------------------------------
+// 🔴 2026-09-09:下面若干零件的 zones 里带着「后补的区域」——
+//    原因是功能的区域程序声明了某个(大类×区域),而库里一件能进那个区域的零件都没有,
+//    于是那一格【静默蒸发】(花店/温室的主区一棵植物都没有)。体检里现在有一条硬判据:
+//    功能声明的每个(大类×区域)在库里必须至少有 3 件零件能进,否则判红。
 export const KITS = [
 
   // ==== 1. seat 座具（18 件）：全部带座位口袋，人从这里长出来 ==============
@@ -203,7 +211,7 @@ export const KITS = [
     zones:['main','aux'], fn:['dining','kitchen','openkitchen','cafe','bakery','teahouse','piecorner','roofdining'], seats:[], tags:['wood'] },
 
   { id:'cafe_table_2', cn:'双人咖啡圆桌', cat:'table', w:0.70, d:0.70, h:0.74,
-    zones:['main','aux','window'], fn:['cafe','bakery','teahouse','winebar','juicebar','piecorner','bookstore','roofdining','roofgarden'], seats:[], tags:['round'] },
+    zones:['main','aux','window'], fn:['cafe', 'bakery', 'teahouse', 'winebar', 'juicebar', 'piecorner', 'bookstore', 'roofdining', 'roofgarden', 'florist', 'grocer'], seats:[], tags:['round'] },
 
   { id:'desk_work', cn:'书桌', cat:'table', w:1.40, d:0.70, h:0.75,
     zones:['main','aux','window'], fn:['study','coworking','bedroom','guestroom','kidroom','atelier','darkroom','mailroom','duty'], seats:[], tags:['work'] },
@@ -339,7 +347,7 @@ export const KITS = [
     zones:['aux','main'], fn:[], seats:[], tags:['low','small'] },
 
   { id:'crate_stack', cn:'板条箱堆', cat:'storage', w:0.50, d:0.35, h:0.90,
-    zones:['aux','main'], fn:['grocer','florist','bakery','storageroom','bikepark','woodshop','records','greenhouse','waterplant','piecorner'], seats:[], tags:[] },
+    zones:['aux', 'main', 'walldec'], fn:['grocer','florist','bakery','storageroom','bikepark','woodshop','records','greenhouse','waterplant','piecorner'], seats:[], tags:[] },
 
   { id:'clothes_rail', cn:'落地挂杆', cat:'storage', w:1.20, d:0.55, h:1.60,
     zones:['main','aux'], fn:['boutique','vanity','bedroom','laundry','hairsalon','storageroom'], seats:[], tags:['tall'] },
@@ -348,7 +356,7 @@ export const KITS = [
     zones:['aux'], fn:['bedroom','vanity','lobby','stairhall','laundry','yoga','boutique','guestroom'], seats:[], tags:['narrow'] },
 
   { id:'pegboard', cn:'洞洞板工具墙', cat:'storage', w:1.20, d:0.06, h:0.90,
-    zones:['walldec'], fn:['woodshop','atelier','sewing','bikeshop','kitchen','greenhouse','laundry','storageroom','waterplant','darkroom'], seats:[], tags:['wall'], wall:true },
+    zones:['walldec'], fn:['woodshop', 'atelier', 'sewing', 'bikeshop', 'kitchen', 'greenhouse', 'laundry', 'storageroom', 'waterplant', 'darkroom', 'salon', 'vanity', 'library', 'openkitchen', 'mailroom'], seats:[], tags:['wall'], wall:true },
 
   { id:'wall_shelf', cn:'挂墙搁板', cat:'storage', w:1.20, d:0.24, h:0.06,
     zones:['walldec'], fn:[], seats:[], tags:['wall'], wall:true },
@@ -415,10 +423,10 @@ export const KITS = [
     zones:['main','aux'], fn:['kitchen','openkitchen','piecorner','bakery','juicebar','grocer','roofbbq'], seats:[], tags:['counter'] },
 
   { id:'spice_rack', cn:'调料架', cat:'cook', w:0.60, d:0.14, h:0.55,
-    zones:['aux','main'], fn:['kitchen','openkitchen','bakery','cafe','piecorner','teahouse'], seats:[], tags:['small'] },
+    zones:['aux','main'], fn:['kitchen', 'openkitchen', 'bakery', 'cafe', 'piecorner', 'teahouse', 'atelier', 'hairsalon', 'darkroom'], seats:[], tags:['small'] },
 
   { id:'pot_hanger', cn:'挂锅杆', cat:'cook', w:1.10, d:0.30, h:0.45,
-    zones:['main','aux'], fn:['kitchen','openkitchen','bakery','piecorner'], seats:[], tags:['overhead'] },
+    zones:['main','aux'], fn:['kitchen', 'openkitchen', 'bakery', 'piecorner', 'atelier', 'hairsalon'], seats:[], tags:['overhead'] },
 
   { id:'dishwasher_door', cn:'洗碗机门', cat:'cook', w:0.60, d:0.60, h:0.82,
     zones:['aux','main'], fn:['kitchen','openkitchen','cafe','bakery','piecorner','teahouse'], seats:[], tags:['machine'] },
@@ -443,13 +451,13 @@ export const KITS = [
     zones:['main','aux'], fn:['cafe','bakery','teahouse','bookstore','records','piecorner','lobby','coworking'], seats:[], tags:['counter'] },
 
   { id:'grinder', cn:'磨豆机', cat:'bar', w:0.25, d:0.35, h:0.55,
-    zones:['main','aux'], fn:['cafe','bakery','teahouse','piecorner','juicebar'], seats:[], tags:['counter','small'] },
+    zones:['main','aux'], fn:['cafe', 'bakery', 'teahouse', 'piecorner', 'juicebar', 'salon', 'dining', 'roofbbq', 'coworking', 'openkitchen', 'bikeshop', 'gallery', 'roofdining', 'duty'], seats:[], tags:['counter','small'] },
 
   { id:'pastry_case', cn:'点心展示柜', cat:'bar', w:1.20, d:0.70, h:1.10,
     zones:['main','window'], fn:['cafe','bakery','piecorner','teahouse','grocer'], seats:[], tags:['cold','anchor'] },
 
   { id:'bread_rack', cn:'面包货架', cat:'bar', w:1.00, d:0.45, h:1.75,
-    zones:['main','aux','window'], fn:['bakery','piecorner','grocer','cafe'], seats:[], tags:['tall'] },
+    zones:['main','aux','window'], fn:['bakery', 'piecorner', 'grocer', 'cafe', 'florist', 'bookstore', 'records', 'boutique', 'juicebar'], seats:[], tags:['tall'] },
 
   { id:'cold_case', cn:'立式冷柜', cat:'bar', w:0.90, d:0.75, h:1.95,
     zones:['main','aux'], fn:['grocer','winebar','juicebar','cafe','bakery','piecorner'], seats:[], tags:['tall','cold'] },
@@ -473,13 +481,13 @@ export const KITS = [
     zones:['walldec'], fn:['cafe','bakery','winebar','juicebar','teahouse','piecorner','grocer','roofdining'], seats:[], tags:['wall','sign'], wall:true },
 
   { id:'menu_sign', cn:'立式菜单牌', cat:'bar', w:0.50, d:0.40, h:1.40,
-    zones:['window','aux'], fn:['cafe','bakery','winebar','juicebar','piecorner','grocer','roofdining','teahouse'], seats:[], tags:['slim','sign'] },
+    zones:['window','aux'], fn:['cafe', 'bakery', 'winebar', 'juicebar', 'piecorner', 'grocer', 'roofdining', 'teahouse', 'florist', 'bookstore', 'records', 'boutique'], seats:[], tags:['slim','sign'] },
 
   { id:'cup_shelf', cn:'杯具挂架', cat:'bar', w:0.90, d:0.25, h:1.20,
     zones:['aux','walldec'], fn:['cafe','teahouse','winebar','juicebar','bakery','piecorner','openkitchen'], seats:[], tags:['tall'] },
 
   { id:'syrup_rail', cn:'糖浆瓶导轨', cat:'bar', w:0.60, d:0.16, h:0.45,
-    zones:['aux','main'], fn:['cafe','juicebar','teahouse','bakery','winebar'], seats:[], tags:['small'] },
+    zones:['aux','main'], fn:['cafe', 'juicebar', 'teahouse', 'bakery', 'winebar', 'salon', 'dining', 'roofbbq'], seats:[], tags:['small'] },
 
   // ==== 7. light 灯具（15 件）：壁挂件用零件级 wall:true 标 =================
   { id:'pendant_single', cn:'单头吊灯', cat:'light', w:0.30, d:0.30, h:0.45,
@@ -525,7 +533,7 @@ export const KITS = [
     zones:['main','aux','walldec'], fn:['gallery','boutique','bookstore','records','florist','atelier','grocer','hairsalon','bikeshop','lobby'], seats:[], tags:['ceiling'] },
 
   { id:'safelight', cn:'暗房红色安全灯', cat:'light', w:0.20, d:0.12, h:0.25,
-    zones:['walldec'], fn:['darkroom'], seats:[], tags:['wall'], wall:true },
+    zones:['walldec'], fn:['darkroom', 'living', 'dining', 'nursery', 'coworking', 'music', 'cinema', 'yoga', 'waterplant', 'duty'], seats:[], tags:['wall'], wall:true },
 
   // ==== 8. textile 织物（16 件） ==========================================
   { id:'rug_large', cn:'大块羊毛地毯（含垫层）', cat:'textile', w:2.40, d:1.70, h:0.06,
@@ -553,10 +561,10 @@ export const KITS = [
     zones:['window'], fn:[], seats:[], tags:['window'] },
 
   { id:'sheer_panel', cn:'落地纱屏', cat:'textile', w:1.20, d:0.08, h:2.30,
-    zones:['window','main'], fn:['salon','teahouse','hairsalon','gallery','bedroom','yoga','boutique','lobby'], seats:[], tags:['window'] },
+    zones:['window', 'main', 'path'], fn:['salon','teahouse','hairsalon','gallery','bedroom','yoga','boutique','lobby'], seats:[], tags:['window'] },
 
   { id:'cushion_set', cn:'靠垫组', cat:'textile', w:0.50, d:0.18, h:0.50,
-    zones:['main','aux','window'], fn:[], seats:[], tags:['small'] },
+    zones:['main', 'aux', 'window', 'path'], fn:[], seats:[], tags:['small'] },
 
   { id:'throw_blanket', cn:'披毯', cat:'textile', w:0.60, d:0.30, h:0.12,
     zones:['main','aux'], fn:[], seats:[], tags:['small'] },
@@ -571,10 +579,10 @@ export const KITS = [
     zones:['main'], fn:['dining','roofdining','teahouse','cafe','bakery','salon','piecorner','greenhouse'], seats:[], tags:['soft'] },
 
   { id:'banner', cn:'挂旗', cat:'textile', w:0.60, d:0.06, h:1.40,
-    zones:['walldec'], fn:['playroom','kidroom','gallery','records','bookstore','roofbbq','lobby','stairhall','boutique','bikeshop'], seats:[], tags:['wall'], wall:true },
+    zones:['walldec', 'path'], fn:['playroom','kidroom','gallery','records','bookstore','roofbbq','lobby','stairhall','boutique','bikeshop'], seats:[], tags:['wall'], wall:true },
 
   { id:'acoustic_panel', cn:'吸音软包', cat:'textile', w:0.60, d:0.06, h:1.20,
-    zones:['walldec'], fn:['music','cinema','darkroom','coworking','atelier','records','yoga'], seats:[], tags:['wall'], wall:true },
+    zones:['walldec', 'path'], fn:['music','cinema','darkroom','coworking','atelier','records','yoga'], seats:[], tags:['wall'], wall:true },
 
   // ==== 9. plant 绿植（13 件） ============================================
   { id:'tall_ficus', cn:'高株琴叶榕', cat:'plant', w:0.60, d:0.60, h:1.75,
@@ -596,19 +604,19 @@ export const KITS = [
     zones:['window'], fn:[], seats:[], tags:['small'] },
 
   { id:'flower_vase', cn:'插花花瓶', cat:'plant', w:0.25, d:0.25, h:0.45,
-    zones:['window','aux'], fn:[], seats:[], tags:['small'] },
+    zones:['window', 'aux', 'main'], fn:[], seats:[], tags:['small'] },
 
   { id:'herb_pot', cn:'香草盆', cat:'plant', w:0.20, d:0.20, h:0.28,
-    zones:['window','aux'], fn:['kitchen','openkitchen','cafe','bakery','greenhouse','teahouse','roofgarden','piecorner','juicebar','waterplant'], seats:[], tags:['small'] },
+    zones:['window', 'aux', 'main'], fn:['kitchen','openkitchen','cafe','bakery','greenhouse','teahouse','roofgarden','piecorner','juicebar','waterplant'], seats:[], tags:['small'] },
 
   { id:'succulent_tray', cn:'多肉盘', cat:'plant', w:0.40, d:0.28, h:0.16,
-    zones:['window','aux'], fn:[], seats:[], tags:['small'] },
+    zones:['window', 'aux', 'main'], fn:[], seats:[], tags:['small'] },
 
   { id:'moss_wall', cn:'苔墙', cat:'plant', w:1.20, d:0.10, h:0.90,
     zones:['walldec'], fn:['greenhouse','florist','gallery','lobby','cafe','coworking','yoga','waterplant','bookstore','skybridge'], seats:[], tags:['wall'], wall:true },
 
   { id:'wreath', cn:'门口花环', cat:'plant', w:0.45, d:0.10, h:0.45,
-    zones:['walldec'], fn:['florist','lobby','stairhall','grocer','bakery','boutique','greenhouse','roofgarden'], seats:[], tags:['wall'], wall:true },
+    zones:['walldec', 'main'], fn:['florist','lobby','stairhall','grocer','bakery','boutique','greenhouse','roofgarden'], seats:[], tags:['wall'], wall:true },
 
   { id:'street_planter', cn:'街边花箱', cat:'plant', w:0.90, d:0.40, h:0.60,
     zones:['path','window'], fn:['florist','grocer','bakery','cafe','bookstore','boutique','bikeshop','roofgarden','lobby','skybridge'], seats:[], tags:['low','outdoor'] },
@@ -627,7 +635,7 @@ export const KITS = [
     zones:['main','aux'], fn:['records','living','salon','music','winebar','cafe','bookstore','teahouse','hairsalon'], seats:[], tags:['small'] },
 
   { id:'speaker_floor', cn:'落地音箱', cat:'media', w:0.25, d:0.32, h:1.05,
-    zones:['main','aux'], fn:['records','music','living','salon','cinema','winebar','yoga','playroom'], seats:[], tags:['slim'] },
+    zones:['main','aux'], fn:['records', 'music', 'living', 'salon', 'cinema', 'winebar', 'yoga', 'playroom', 'boutique', 'hairsalon', 'gallery'], seats:[], tags:['slim'] },
 
   { id:'record_bin', cn:'唱片翻箱', cat:'media', w:1.00, d:0.60, h:0.95,
     zones:['main','aux'], fn:['records','bookstore','grocer'], seats:[], tags:['low'] },
@@ -663,7 +671,7 @@ export const KITS = [
     zones:['walldec'], fn:['playroom','kidroom','coworking','woodshop','atelier','library','nursery','greenhouse','duty','mailroom'], seats:[], tags:['wall'], wall:true },
 
   { id:'desktop_pc', cn:'台式机主机', cat:'media', w:0.22, d:0.45, h:0.45,
-    zones:['aux','main'], fn:['coworking','study','atelier','darkroom','music','mailroom','duty','records'], seats:[], tags:['small'] },
+    zones:['aux','main'], fn:['coworking', 'study', 'atelier', 'darkroom', 'music', 'mailroom', 'duty', 'records', 'cinema'], seats:[], tags:['small'] },
 
   { id:'monitor_dual', cn:'双屏显示器', cat:'media', w:1.20, d:0.25, h:0.55,
     zones:['main','aux'], fn:['coworking','study','atelier','music','darkroom','duty'], seats:[], tags:['desk'] },

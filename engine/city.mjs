@@ -21,8 +21,18 @@ export const BAND_RULES = {
 
 // ── 相邻规则 ────────────────────────────────────────────────
 // avoid = 不许相邻(assemble 排格时硬拒);like = 优先相邻(加权)。
+// 🔴 noSameNeighbor:同一个功能不许紧挨自己。
+//    指引开篇批评的就是「同一功能的房间看起来像复制粘贴」,但第一版没有任何机制拦它。
+//    assemble() 抽房间时过滤,auditCity() 判红,两边用同一个开关。
 export const ADJACENCY = {
-  avoid : [
+  noSameNeighbor: true,
+  avoid: [
+    // 🔴 指引原话「两间厨房不要并排」——第一版整套规则里一条含 kitchen 的自对都没有,
+    //    独立验收实测 9000 对相邻里犯了 18 次,而体检每一栋都判绿。这三对是补上的。
+    ['kitchen', 'kitchen'],        // 两间家庭厨房并排 = 指引明令禁止
+    ['openkitchen', 'openkitchen'],// 开放餐厨同理
+    ['kitchen', 'openkitchen'],    // 两种厨房并排也算并排
+
     ['kitchen','bedroom'],       // 油烟与睡眠正面冲突,墙再厚也挡不住味
     ['woodshop','nursery'],      // 电锯与婴儿作息不可能共存,这是最硬的一对
     ['woodshop','darkroom'],     // 木屑一旦飘进显影盘,整批片子作废

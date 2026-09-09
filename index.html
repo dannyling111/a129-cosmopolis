@@ -210,7 +210,7 @@
     </section>
 
     <section id="kits">
-      <h2>套件 12 大类，约 120 个零件</h2>
+      <h2>套件 12 大类，<span id="kitcount">…</span> 个零件</h2>
       <p class="sec">
         升级前家具是一张扁列表：沙发、椅子、床、灯……引擎不知道「这是座具还是灯」。现在大类先定、零件后抽：同类可互换，跨类不能乱放（落地灯不许进餐桌区，灶不许进卧室主区）——这条是机器拦的，故意把灶塞进窗墙区，体检会当场判红。
       </p>
@@ -343,6 +343,8 @@
 
     import('./engine/index.mjs').then(m => {
       document.getElementById('ver').textContent = '· 引擎 v' + m.COSMOPOLIS_VERSION;
+      // 这个数也读引擎:上一版这里手写「约 120」,而下面那颗 pill 已经是 193,两个数打架
+      const kc = document.getElementById('kitcount'); if (kc) kc.textContent = String(ENGINE_KITS.length);
       console.log('COSMOPOLIS v' + m.COSMOPOLIS_VERSION);
     });
 

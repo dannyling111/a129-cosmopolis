@@ -73,7 +73,9 @@ function place(kit, zone, placed, rng, pull = { x: 0, z: 0 }) {
   }
   if (!opts.length) return null;
   opts.sort((a, b) => a.cost - b.cost);
-  // 前几名里随机挑一个:同一份文本仍可复算,但不会每间房都摆得一模一样
+  // 前几名里随机挑一个:同一份文本仍可复算,但不会每间房都摆得一模一样。
+  // 角落(通行程序)例外:它必须紧贴走道,给随机余地就会被推开到 0.4m 以外。
+  if (zone.role === 'path') return opts[0];
   const top = opts.slice(0, Math.max(1, Math.min(6, Math.ceil(opts.length * 0.12))));
   return top[Math.floor(rng.f() * top.length)];
 }
@@ -122,14 +124,21 @@ export function planRoom(fnId, o = {}) {
   // 通行区永远留空(人只走这里)。功能程序里写在 path 的零件 = 指引说的「留空 + 角植」,
   // 它落在【紧贴通行区的那个角落】,属于 path 程序但不占走道 —— 两件事必须分开,
   // 否则「角植」和「挡道」在数据上长得一模一样,判据就永远抓不住后者。
+  // 🔴 角落必须【从通行区的边上量出来】,不能从主区/辅区量。
+  //    第一版拿"面积大的那一块"当宿主,布置程序一换(靠墙沙发/侧向围坐),那一块可能整个挪到房间另一头,
+  //    于是"角植"跑到房间正中央去了 —— 独立验收实测 250 件角植里 41 件离通行区超过 0.40m,最远 2.35m。
   const cornerZone = (() => {
-    const p = z.roles.path, m = z.roles.main, a = z.roles.aux;
-    const host = m.area >= a.area ? m : a;
-    const side = host.x < p.x ? 'left' : 'right';
-    const cw = Math.min(0.95, host.w), cd = Math.min(0.95, host.d);
+    const p = z.roles.path;
+    const cw = 0.90, cd = 0.90;
+    const leftRoom = p.x, rightRoom = w - (p.x + p.w);
+    const useLeft = leftRoom >= rightRoom;
+    const wv = Math.min(cw, Math.max(0.35, useLeft ? leftRoom : rightRoom));
     return { role: 'path', mount: 'floor',
-             x: side === 'left' ? host.x + host.w - cw : host.x,
-             z: host.z, w: cw, d: cd, area: +(cw * cd).toFixed(2) };
+             x: useLeft ? p.x - wv : p.x + p.w,          // 紧贴走道那条边,不留缝
+             z: p.z, w: wv, d: Math.min(cd, p.d),
+             // 角落有 0.9m 宽,零件如果落在远端那一侧,离走道仍会超过 0.4m —— 所以还要【往走道那边推】
+             pull: { x: useLeft ? 1.5 : -1.5, z: 0 },
+             area: +(wv * Math.min(cd, p.d)).toFixed(2) };
   })();
 
   const items = [], seats = [], skipped = [];
@@ -173,12 +182,27 @@ export function planRoom(fnId, o = {}) {
       }
       // 碰撞要拿【全部地面家具】比,不能只比同一个区域的 ——
       // 角植所在的角落是从主区/辅区身上切出来的,只比同区域就必然和主区的椅子叠在一起
-      const spot = place(kit, zone, role === 'path' ? items.filter(i => i.mount === 'floor') : placedHere, rng, pullFor(role, z));
-      if (!spot) { skipped.push({ role, cat: kit.cat, kit: kit.id, why: '这块区域放不下了' }); continue; }
-      const it = { kit: kit.id, cn: kit.cn, cat: kit.cat, zone: role, mount: 'floor',
-                   rot: spot.rot, box: spot.box, lift: 0, h: kit.h };
+      const blockers = role === 'path' ? items.filter(i => i.mount === 'floor') : placedHere;
+      const pull = role === 'path' ? zone.pull : pullFor(role, z);
+      let spot = place(kit, zone, blockers, rng, pull), used = kit;
+      if (!spot) {
+        // 🔴 抽到的那件塞不下时,换【同一大类里更小的】再试,而不是直接放弃。
+        //    「同类可互换」本来就是这套语法的核心;第一版一次不成就跳过,实测静默跳过率 13.3%,
+        //    温室主区一棵植物都没有 —— 少的不是一件家具,是那一格该有的事件。
+        const smaller = candidates(kit.cat, role, fnId)
+          .filter(k => k.id !== kit.id && fitsZone(k, zone) && (k.w * k.d) < (kit.w * kit.d))
+          .sort((a, b) => (b.w * b.d) - (a.w * a.d));
+        for (const alt of smaller) {
+          spot = place(alt, zone, blockers, rng, pull);
+          if (spot) { used = alt; break; }
+        }
+      }
+      if (!spot) { skipped.push({ role, cat: kit.cat, kit: kit.id, why: '这块区域放不下了(同类更小的也试过)' }); continue; }
+      const kitP = used;
+      const it = { kit: kitP.id, cn: kitP.cn, cat: kitP.cat, zone: role, mount: 'floor',
+                   rot: spot.rot, box: spot.box, lift: 0, h: kitP.h };
       items.push(it); placedHere.push(it);
-      pocketsOf(kit, spot.box, spot.rot).forEach(p => seats.push({ ...p, zone: role }));
+      pocketsOf(kitP, spot.box, spot.rot).forEach(p => seats.push({ ...p, zone: role }));
     }
   }
 
@@ -211,7 +235,7 @@ export function planRoom(fnId, o = {}) {
   return {
     fn: fnId, cn: fn.cn, fam: fn.fam, w, d, h, seed, program,
     area: +(w * d).toFixed(2),
-    zones: z, items, seats, skipped,
+    zones: z, items, seats, skipped, corner: cornerZone,
     path: { ...z.roles.path, clear: clear.ok, why: clear.why },
     doorX: z.meta.doorX,
   };
@@ -223,16 +247,22 @@ export function auditRoom(plan) {
   const zs = plan.zones.roles;
   plan.items.forEach(it => {
     const zone = zs[it.zone];
-    if (it.mount === 'floor' && it.zone !== 'path') {
-      if (!(it.box.x >= zone.x - 0.02 && it.box.z >= zone.z - 0.02 &&
-            it.box.x + it.box.w <= zone.x + zone.w + 0.02 &&
-            it.box.z + it.box.d <= zone.z + zone.d + 0.02)) bad.push(`${it.kit} 越出了 ${it.zone} 区`);
-      if (overlaps(it.box, zs.path, 0.005)) bad.push(`${it.kit} 压住了通行区`);
-      if (it.zone === 'path') {
-        const p = zs.path;
-        const near = Math.min(Math.abs(it.box.x + it.box.w - p.x), Math.abs(p.x + p.w - it.box.x));
-        if (near > 0.40) bad.push(`${it.kit} 挂在 path 程序名下,却离通行区 ${near.toFixed(2)}m,不是角植`);
+    if (it.mount === 'floor') {
+      if (it.zone !== 'path') {
+        if (!(it.box.x >= zone.x - 0.02 && it.box.z >= zone.z - 0.02 &&
+              it.box.x + it.box.w <= zone.x + zone.w + 0.02 &&
+              it.box.z + it.box.d <= zone.z + zone.d + 0.02)) bad.push(`${it.kit} 越出了 ${it.zone} 区`);
+      } else {
+        // 🔴 这一条以前被写在 `it.zone !== 'path'` 的里面,所以【永远跑不到】——独立验收把它揪出来了。
+        //    判据不用「离走道 0.40m 以内」这种魔法数字,而是【必须落在那个紧贴走道的角落矩形里】:
+        //    角落是从走道边上量出来的,所以"在角落里"本身就等价于"贴着走道",且没有例外要背。
+        const c = plan.corner;
+        if (c && !(it.box.x >= c.x - 0.02 && it.box.z >= c.z - 0.02 &&
+                   it.box.x + it.box.w <= c.x + c.w + 0.02 &&
+                   it.box.z + it.box.d <= c.z + c.d + 0.02))
+          bad.push(`${it.kit} 挂在 path 程序名下,却没落在贴着走道的那个角落里(占了主区的地)`);
       }
+      if (overlaps(it.box, zs.path, 0.005)) bad.push(`${it.kit} 压住了通行区`);
     }
     const cat = CAT_BY_ID[it.cat];
     if (cat && !cat.zones.includes(it.zone)) bad.push(`${it.kit}(${it.cat})跨类乱放进了 ${it.zone}`);

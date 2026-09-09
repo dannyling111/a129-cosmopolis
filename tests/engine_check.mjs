@@ -11,10 +11,10 @@ import { KITS, KIT_CATS } from '../engine/kits.mjs';
 import { FUNCTIONS, FN_FAMILIES } from '../engine/functions.mjs';
 import { SCRIPTS, BODIES } from '../engine/people.mjs';
 import { BAND_RULES, ADJACENCY, STREET } from '../engine/city.mjs';
-import { planRoom, auditRoom, CAT_BY_ID } from '../engine/room.mjs';
+import { planRoom, auditRoom, CAT_BY_ID, candidates } from '../engine/room.mjs';
 import { cutZones, PROGRAMS, PROGRAM_IDS } from '../engine/zones.mjs';
 import { castRoom } from '../engine/actors.mjs';
-import { assemble, auditCity } from '../engine/building.mjs';
+import { assemble, auditCity, poolFor } from '../engine/building.mjs';
 import { ROLE_IDS } from '../engine/zones.mjs';
 
 let fail = 0, pass = 0;
@@ -58,6 +58,36 @@ ok(ADJACENCY.avoid.length >= 8 && ADJACENCY.like.length >= 8, '相邻规则 ≥8
    `${ADJACENCY.avoid.length}/${ADJACENCY.like.length}`);
 ok(['ground', 'mid', 'top', 'roof'].every(b => BAND_RULES[b] && BAND_RULES[b].fams.length), '四个层带规则齐全');
 ok(!!STREET && Array.isArray(STREET.lamps), '街道规则存在');
+
+// 🔴🔴 蓝图规则硬锚(2026-09-09 独立验收之后补的,这是本轮最重要的一条)
+//    命门:auditCity 的规则和它要判的数据【是同一份文件】。独立验收把 city.mjs 改坏三次
+//    (屋顶放开厨房 / 临街对外比例改成 0 / 删掉厨房不挨卧室),36 条判据【全部照样判绿】——
+//    因为规则被删了,判据也跟着不存在了。所以下面这几条把【指引原文的规则值】硬写在测试里,
+//    与 city.mjs 无关:改坏 city.mjs,这里立刻红。这和 BP_CATS/BP_FNS 是同一招。
+const roofPool = poolFor('roof').map(f => f.id);
+ok(!roofPool.some(id => ['kitchen', 'openkitchen'].includes(id)),
+   '蓝图锚:屋顶层带永远抽不到厨房(指引原话「不许把厨房搬上去」)', roofPool.join(','));
+ok(!roofPool.some(id => ['darkroom', 'woodshop', 'server'].includes(id)),
+   '蓝图锚:屋顶层带也抽不到暗房/木作/机房这类不该上屋顶的');
+ok((BAND_RULES.ground.publicMin || 0) >= 0.66,
+   '蓝图锚:地面层对外比例要求 ≥2/3(指引原话「至少三分之二是对外的」)', String(BAND_RULES.ground.publicMin));
+const avoidSet = new Set((ADJACENCY.avoid || []).map(p => p.slice().sort().join('|')));
+[['kitchen', 'kitchen'], ['kitchen', 'openkitchen']].forEach(pair => {
+  ok(avoidSet.has(pair.slice().sort().join('|')),
+     `蓝图锚:相邻规则必须含 ${pair.join('↔')}(指引原话「两间厨房不要并排」)`);
+});
+ok(ADJACENCY.noSameNeighbor === true,
+   '蓝图锚:同一个功能不许紧挨自己(指引开篇批评的「像复制粘贴」)');
+
+// ② 区域程序不许声明「大类天花板不允许」的组合 —— 这类错不报错,只是【静默蒸发】
+{
+  const ceil = Object.fromEntries(KIT_CATS.map(c => [c.id, c.zones || []]));
+  const illegal = [];
+  FUNCTIONS.forEach(f => Object.entries(f.zones).forEach(([role, list]) =>
+    (list || []).forEach(e => { if (!(ceil[e.cat] || []).includes(role)) illegal.push(`${f.id}.${role}←${e.cat}`); })));
+  ok(illegal.length === 0, '没有区域程序声明了大类天花板不允许的组合(否则那些件会静默蒸发)',
+     illegal.slice(0, 6).join(' '));
+}
 const zoneSig = new Set(FUNCTIONS.map(f => JSON.stringify(f.zones)));
 ok(zoneSig.size === FUNCTIONS.length, '48 个功能的区域程序互不相同(没灌水)', `去重后 ${zoneSig.size}`);
 ok(FUNCTIONS.every(f => Object.values(f.zones).every(l => (l || []).every(e => e.cat !== 'person'))),
@@ -76,6 +106,43 @@ for (const f of FUNCTIONS) for (let s = 0; s < 5; s++) {
 ok(roomBad.length === 0, `240 间房全部通过房内规则`, roomBad.slice(0, 3).join(' | '));
 ok(emptyN === 0, '没有一间房是空的', emptyN + ' 间空房');
 ok(itemN / roomN >= 4, `平均每间 ≥4 件套件`, '实得 ' + (itemN / roomN).toFixed(1));
+{
+  // 「放不下就跳过」是对的,但跳太多说明库或程序有系统性错配,而这件事以前没有任何判据在看。
+  // 两条判据分开:整体率是【体温计】(剩下的确实是物理上塞不下),单功能率是【报警器】——
+  // 某一个功能的程序被吞掉一半以上,那一格就不是"少了件家具",是"该有的事件没了"。
+  let skipped = 0, want = 0, worst = ['-', 0];
+  const noKit = [];
+  for (const f of FUNCTIONS) {
+    let fs = 0, fw = 0;
+    for (let s = 0; s < 5; s++) {
+      const p = planRoom(f.id, { seed: 'skip' + s, tag: 's' + s });
+      fs += p.skipped.length; fw += p.items.length + p.skipped.length;
+      p.skipped.forEach(k => { if (/库里没有/.test(k.why)) noKit.push(`${f.id}.${k.role}←${k.cat}`); });
+    }
+    skipped += fs; want += fw;
+    if (fw && fs / fw > worst[1]) worst = [f.id, fs / fw];
+  }
+  const rate = skipped / Math.max(1, want);
+  ok(rate <= 0.10, `整体静默跳过率 ≤10%(剩下的是真放不下,不是数据错配)`,
+     `实得 ${(rate * 100).toFixed(1)}%(${skipped}/${want})`);
+  ok(worst[1] <= 0.40, `没有哪个功能被吞掉四成以上程序`, `最差 ${worst[0]} ${(worst[1] * 100).toFixed(0)}%`);
+  ok(noKit.length === 0, `没有"库里一件都没有"型的蒸发(声明了却根本抽不到)`, noKit.slice(0, 5).join(' '));
+}
+{
+  // 结构判据:功能声明的每个(大类×区域),库里必须至少有 3 件零件能进 ——
+  // 「同类可互换」如果只剩 1 件可换,那就不叫可互换;0 件就是静默蒸发。
+  // 🔴 必须【按功能】判:大类×区域整体有 5 件可换,但零件的 fn 白名单可能把这个功能全挡在外面,
+  //    结果就是"声明了却一件也抽不到"(实测 salon.aux←bar 就是这样)。整体判会漏掉它。
+  const thin = [], zero = [];
+  FUNCTIONS.forEach(f => Object.entries(f.zones).forEach(([role, l]) => (l || []).forEach(e => {
+    const n = candidates(e.cat, role, f.id).length;
+    if (n === 0) zero.push(`${f.id}.${role}←${e.cat}`);
+    else if (n < 2) thin.push(`${f.id}.${role}←${e.cat} 只有 ${n} 件`);
+  })));
+  ok(zero.length === 0, '没有功能声明了却一件也抽不到的(大类×区域)', zero.slice(0, 5).join(' '));
+  // 阈值定 0 不是拍脑袋:「同类可互换」这句话在只有 1 件可换时就是假的,没有中间态。
+  ok(thin.length === 0, '「同类可互换」名副其实:每个组合都至少有 2 件可换', `${thin.length} 处 ${thin.slice(0, 3).join(' ')}`);
+}
 
 // ---------- 2.5 布置程序:换一套程序,区域角色真的换位置 ----------
 H('【2.5】布置程序(第 2 层的四套变体)');
@@ -164,8 +231,27 @@ H('【6】变红证明(负控:判据本身有没有被证明会红)');
   // 负控 E:社区规则 —— 把厨房搬上屋顶,必须判红
   const b = assemble({ seed: 'redcity', levels: 3, bays: 3 });
   const roof = b.floors[b.floors.length - 1];
-  roof.rooms[0] = { ...roof.rooms[0], fn: 'kitchen', cn: '厨房', fam: 'eat', public: false };
-  ok(auditCity(b).ok === false, '负控E:厨房搬上屋顶 → 必须判红');
+  // 🔴 这里以前写的是 fam:'eat' —— 而真的族 id 叫 'cook',所以它其实是靠「族名不存在」侥幸变红的,
+  //    分不清「屋顶禁厨这条规则还在」和「这条规则被删了」。独立验收把这个揪出来了,现在用真族名。
+  roof.rooms[0] = { ...roof.rooms[0], fn: 'kitchen', cn: '家庭厨房', fam: 'cook', public: false };
+  const rE = auditCity(b);
+  ok(rE.ok === false && rE.problems.some(x => x.includes('厨房')),
+     '负控E:厨房搬上屋顶(用真族名 cook) → 必须判红', rE.problems[0] || '');
+  // 负控 F:同一功能并排 —— 指引说「两间厨房不要并排」,这条以前引擎里根本没有机制
+  const b3 = assemble({ seed: 'redsame', levels: 3, bays: 3 });
+  const f1 = b3.floors[1];
+  f1.rooms[1] = { ...f1.rooms[1], fn: f1.rooms[0].fn, cn: f1.rooms[0].cn, fam: f1.rooms[0].fam, public: f1.rooms[0].public };
+  const rF = auditCity(b3);
+  ok(rF.ok === false && rF.problems.some(x => x.includes('并排')), '负控F:同一功能两间并排 → 必须判红', rF.problems[0] || '');
+  // 负控 G:角植跑到房间中央(这条判据以前是死代码,写了从没跑过)
+  const pg = planRoom('living', { seed: 'redcorner', tag: 'g' });
+  const pg2 = JSON.parse(JSON.stringify(pg));
+  const mz = pg2.zones.roles.main;
+  pg2.items.push({ kit: 'FAKE_PLANT', cn: '假角植', cat: 'plant', zone: 'path', mount: 'floor', rot: 0,
+                   box: { x: mz.x + mz.w / 2, z: mz.z + mz.d / 2, w: 0.4, d: 0.4 }, lift: 0, h: 1.2 });
+  const rG = auditRoom(pg2);
+  ok(rG.ok === false && rG.problems.some(x => x.includes('角落')),
+     '负控G:角植占了主区的地 → 必须判红', rG.problems[0] || '');
   const b2 = assemble({ seed: 'redcity', levels: 3, bays: 3 });
   ok(auditCity(b2).ok === true, '正控:真 assemble 的楼 → 必须判绿', (auditCity(b2).problems[0] || ''));
 }

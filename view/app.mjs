@@ -50,7 +50,9 @@ function build() {
   fitAll();
   sel = null; selZone = 'main';
   $('#hudTitle').textContent = `${B.floors.length} 层 · ${B.bays} 开间 · ${B.stats.rooms} 间房`;
-  $('#hudStat').textContent = `${B.stats.distinctFn} 种功能 · ${B.stats.items} 件套件 · ${B.stats.actors} 个人`;
+  // 「本栋」两个字不能省:这里是这一栋楼抽到的功能种数(常见 14 上下),
+  // 而 14 恰好是指引里"升级前只有 14 种"那个数字,不加限定词一眼看去像在自打脸
+  $('#hudStat').textContent = `本栋 ${B.stats.distinctFn} 种功能 · ${B.stats.items} 件套件 · ${B.stats.actors} 个人 ｜ 库里 ${FUNCTIONS.length} 种`;
   $('#hudPick').textContent = '点一间房看它的五块区域';
   renderAll();
 }
