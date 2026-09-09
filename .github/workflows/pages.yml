@@ -34,7 +34,18 @@ jobs:
           force_orphan: true
           exclude_assets: '.github,.github/**'
 
-  deploy:                      # 真正上线的这一条
+  # 🔴 这一条【现在必然失败,但故意留着】——原因写在下面,别当成坏掉的 CI 删掉:
+  #   实测 deploy-pages@v4 报 `Failed to create deployment (status: 404)
+  #   Ensure GitHub Pages has been enabled`,configure-pages 也 CREATE 不出来
+  #   (Resource not accessible by integration)。工作流令牌开不了 Pages 这个口子,
+  #   只有仓库拥有者能在 Settings → Pages 里选一次来源。三种选法都能立刻生效,因为
+  #   main 根目录和 gh-pages 分支【现在都已经是完整站点】:
+  #     · Source = GitHub Actions            → 这一条 deploy 作业立刻开始工作
+  #     · Source = Deploy from a branch: gh-pages / (root)
+  #     · Source = Deploy from a branch: main / (root)
+  #   选好之后把 continue-on-error 去掉即可。
+  deploy:
+    continue-on-error: true    # 见上:等仓库设置里选一次来源,选完删掉这一行
     runs-on: ubuntu-latest
     environment:
       name: github-pages
