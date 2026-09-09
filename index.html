@@ -149,6 +149,7 @@
         <a href="#city">社区</a>
         <a href="#clone">复制</a>
         <a href="#phases">顺序</a>
+        <a href="./studio.html" style="color:var(--accent);font-weight:600">沙盘 ↗</a>
       </nav>
     </div>
   </header>
@@ -159,16 +160,23 @@
       <p class="lede">
         积木城市不是「往房间里扔家具」。量化引擎是一套模板：社区决定这一格干什么，功能决定大区域，套件在区域内组合，人物按场景坐、走、忙。客厅是母模板，其它房间都从它克隆。
       </p>
-      <div class="pills">
-        <span class="pill">现状：14 种功能 · 约 40 件家具</span>
-        <span class="pill">指引：48 种功能 · 12 大类 · 120 套件</span>
-        <span class="pill">这一版只出工作指引，不改三维引擎</span>
+      <div class="pills" id="live-pills">
+        <span class="pill">正在读引擎…</span>
       </div>
+      <p style="margin:18px 0 0">
+        <a href="./studio.html" style="display:inline-flex;align-items:center;gap:10px;min-height:48px;padding:0 22px;
+           background:var(--accent);color:var(--accent-fg);border-radius:14px;font-weight:600;text-decoration:none">
+          打开量化沙盘 · 真跑一遍五层 →
+        </a>
+      </p>
+      <p class="lede" style="font-size:14px;color:var(--muted);margin-top:10px">
+        这一版不只是指引：五层已经写成可运行的引擎，本页下面每一张表的数字，都是从引擎里读出来的，不是手写的。
+      </p>
     </div>
 
     <section id="layers">
       <h2>五层量化，不许跳级</h2>
-      <p class="sec">现在的引擎是两段：整栋抽房间，房间再微扰家具。缺的是中间三层——区域、套件、人物脚本。以后生成一间房，必须按这个顺序走，不能从功能直接跳到一张沙发坐标。</p>
+      <p class="sec">升级前的引擎只有两段：整栋抽房间，房间再微扰家具。缺的中间三层——区域、套件、人物脚本——现在都补上了。生成一间房必须按这个顺序走，代码里也拦住了：从功能直接跳到一张沙发坐标这条路已经不存在。</p>
       <div class="layers">
         <article class="layer">
           <b>0</b><small>社区 / 楼</small>
@@ -196,7 +204,7 @@
     <section id="functions">
       <h2>功能从 14 种扩到 48 种</h2>
       <p class="sec">
-        现在只有起居、卧室、厨房、咖啡、烘焙、书库、工作室、店铺、屋顶、温室、游戏、客房、梳妆、办公。太粗，同一功能的房间看起来像复制粘贴。下面按社区生活切成六族，共 48 个功能。不灌水到 140 个空名字——组合量来自「功能 × 区域程序 × 套件 × 人物」，不是靠堆功能名。
+        升级前只有起居、卧室、厨房、咖啡、烘焙、书库、工作室、店铺、屋顶、温室、游戏、客房、梳妆、办公 —— 太粗，同一功能的房间看起来像复制粘贴。现在按社区生活切成六族共 48 个功能，全部已在引擎里跑通（下面每个名字都是从引擎读出来的）。不灌水到 140 个空名字——组合量来自「功能 × 区域程序 × 套件 × 人物」，不是靠堆功能名。
       </p>
       <div class="grid-2" id="fn-list"></div>
     </section>
@@ -204,14 +212,14 @@
     <section id="kits">
       <h2>套件 12 大类，约 120 个零件</h2>
       <p class="sec">
-        现在家具是一张扁列表：沙发、椅子、床、灯……引擎不知道「这是座具还是灯」。大类先定，零件后抽。同类可互换，跨类不能乱放（落地灯不许进餐桌区，灶不许进卧室主区）。
+        升级前家具是一张扁列表：沙发、椅子、床、灯……引擎不知道「这是座具还是灯」。现在大类先定、零件后抽：同类可互换，跨类不能乱放（落地灯不许进餐桌区，灶不许进卧室主区）——这条是机器拦的，故意把灶塞进窗墙区，体检会当场判红。
       </p>
       <div class="grid-3" id="kit-list"></div>
     </section>
 
     <section id="living">
       <h2>客厅母模板</h2>
-      <p class="sec">先把客厅做对。其它房间不重新发明语法，只替换每个区域里的套件族。点平面上的区域，看这一块允许什么、人物在里面干什么。</p>
+      <p class="sec">先把客厅做对，其它房间不重新发明语法，只替换每个区域里的套件族。下面这张图是静态说明；要看引擎真排出来的平面、真长出来的人，去<a href="./studio.html">量化沙盘</a>点任意一间房的「区域」页。</p>
       <div class="prog" id="programs"></div>
       <div class="plan-wrap">
         <div>
@@ -289,51 +297,55 @@
 
     <section id="phases">
       <h2>落地顺序</h2>
-      <p class="sec">这一版只完成第 0 步。三维房间先不要扩十倍，避免又做一堆穿模家具。母模板稳了，再复制。</p>
+      <p class="sec">第 0–4 步已经全部落进代码，每一步都挂着一条机器判据（<code>tests/engine_check.mjs</code>，负控先证明它会红，再看它是不是绿）。</p>
       <div class="steps">
-        <div class="step"><strong>0 · 工作指引</strong><br />本页。把功能、区域、套件、人物、社区规则写成同一套语言。</div>
-        <div class="step"><strong>1 · 客厅模板进引擎</strong><br />planRoom 改为按五区落套件，不再整房抖动。布置程序只改区域角色，不改零件尺寸。</div>
-        <div class="step"><strong>2 · 克隆四间</strong><br />卧室、厨房、咖啡、书房用同一区域角色表换套件族。人物脚本一起换。</div>
-        <div class="step"><strong>3 · 套件库扩容</strong><br />按 12 大类补零件。同类互换，碰撞盒和座位口袋跟零件走。</div>
-        <div class="step"><strong>4 · 社区规则</strong><br />层带、相邻、街道行人写进 assemble()。楼看起来像一条街，不是随机拼盘。</div>
+        <div class="step"><strong>0 · 工作指引</strong> ✅<br />本页。功能、区域、套件、人物、社区规则写成同一套语言；现在本页的数字直接读引擎，不再手写第二份。</div>
+        <div class="step"><strong>1 · 客厅模板进引擎</strong> ✅<br /><code>planRoom()</code> 按五区落套件，不再整房抖动。四套布置程序只改区域角色的位置与大小，零件尺寸一个不动。</div>
+        <div class="step"><strong>2 · 克隆 48 间</strong> ✅<br />不止四间：48 个功能共用同一张区域角色表，只换套件族与人物脚本。判据：48 × 5 个种子 = 240 间房逐间过体检。</div>
+        <div class="step"><strong>3 · 套件库扩容</strong> ✅<br />12 大类按指引原名建库；碰撞盒和座位口袋跟着零件走，不跟房间走。人是从家具自带的口袋里长出来的。</div>
+        <div class="step"><strong>4 · 社区规则</strong> ✅<br />层带、相邻、对外比例、街道行人写进 <code>assemble()</code>，在<b>抽房间的时候</b>生效。判据：20 个种子各抽一栋楼逐条核。</div>
+        <div class="step" style="border-color:var(--accent)"><strong>下一步 · 还没做的</strong><br />零件目前用色块代表大类（看得出「这是座具还是灯」，但不是成品家具模型）；门窗洞口只做了外墙那一面；楼与楼之间还没连成街区。</div>
       </div>
     </section>
 
     <footer>
-      CosmoPolis · A129 独立仓库网页 · 量化积木城市工作指引
+      CosmoPolis · A129 独立仓库网页 · 量化积木城市工作指引 <span id="ver"></span>
       · <a href="https://github.com/dannyling111/a129-cosmopolis">仓库</a>
     </footer>
   </main>
 
-  <script>
-    const FNS = [
-      { id: "dwell", name: "住", n: "8", now: "起居 / 卧 / 客 / 梳妆", items: ["起居客厅","会客沙龙","家庭餐厅","主卧","儿童房","婴儿房","客房","梳妆更衣"] },
-      { id: "make", name: "作", n: "8", now: "书库 / 办公 / 工作室", items: ["书房","墙到墙书库","共工位","音乐室","画室","缝纫间","木作间","暗房"] },
-      { id: "cook", name: "食", n: "8", now: "厨房 / 咖啡 / 烘焙", items: ["家庭厨房","开放餐厨","咖啡吧","烘焙工坊","茶室","酒铺吧","果汁吧","街角馅饼"] },
-      { id: "shop", name: "市", n: "8", now: "店铺 / 花店", items: ["花店","书店","杂货","唱片行","服装橱窗","理发","自行车铺","门厅接待"] },
-      { id: "gather", name: "聚", n: "8", now: "游戏 / 屋顶 / 温室", items: ["儿童游戏","小展厅","放映角","瑜伽垫间","温室","屋顶花园","屋顶烧烤","屋顶餐廊"] },
-      { id: "service", name: "服", n: "8", now: "无", items: ["楼梯厅","洗衣","信箱间","车棚","储藏","水房花槽","值班小间","连廊"] },
-    ];
-    const KITS = [
-      { name: "座具", n: 12, items: ["三人沙发","双人","贵妃榻","扶手椅","翼椅","餐椅","吧凳","长凳","蒲团","摇椅","办公椅","地垫坐"] },
-      { name: "桌案", n: 10, items: ["茶几","餐桌","书桌","玄关几","边几","吧台面","岛台","折叠桌","梳妆台","野餐桌"] },
-      { name: "睡眠", n: 8, items: ["双人床","单人","上下铺","坐卧榻","婴儿床","床头柜","床屏","吊床"] },
-      { name: "收纳", n: 10, items: ["衣柜","层架","通高书墙","边柜","箱","板条箱","挂杆","鞋架","洞洞板","边橱"] },
-      { name: "厨作", n: 10, items: ["冰箱","灶","烤箱","水槽","操作台","烟罩","调料架","砧板台","挂锅","洗碗机门"] },
-      { name: "餐吧", n: 10, items: ["吧身","咖啡机","点心柜","面包架","黑板","收银","酒龙头","冷柜","菜单牌","蛋糕座"] },
-      { name: "灯具", n: 10, items: ["吊灯","落地灯","台灯","壁灯","串灯","霓虹","烛簇","天光洗","书桌灯","纸灯"] },
-      { name: "织物", n: 10, items: ["地毯","帘","靠垫","披毯","床品","帐","桌布","挂旗","垫","纱"] },
-      { name: "绿植", n: 10, items: ["高株","灌木","垂盆","窗箱","花瓶","香草盆","小树","苔墙","多肉盘","花环"] },
-      { name: "媒介", n: 10, items: ["电视","唱机","音箱","投影","画","照片墙","钟","镜","灯牌","黑板"] },
-      { name: "建筑", n: 10, items: ["窗","门","栏杆","柱","拱","百叶","阳台板","天窗","线脚","隔断"] },
-      { name: "人物", n: 12, items: ["坐沙发","坐椅","坐凳","走","烹","侍","读","谈","望窗","睡沿","孩玩","猫"] },
-    ];
-    const PROGRAMS = [
-      { id: 0, name: "会客朝向", hint: "沙发对切开面，茶几在前，阅读椅在侧。" },
-      { id: 1, name: "靠墙沙发", hint: "沙发贴窗墙，围坐退到房间深处。" },
-      { id: 2, name: "侧向围坐", hint: "沙发沿侧墙，媒介墙正对切开面。" },
-      { id: 3, name: "阅读角落", hint: "主区缩小，阅读椅和灯变成主角。" },
-    ];
+  <script type="module">
+    // 🔴 这一页不再自己存一份功能表/套件表 —— 全部从引擎读。
+    // 两份真理源必然会漂:指引说 120 件、引擎里是别的数,而谁都不会发现。
+    import { FUNCTIONS, FN_FAMILIES } from './engine/functions.mjs';
+    import { KITS as ENGINE_KITS, KIT_CATS } from './engine/kits.mjs';
+    import { PROGRAMS as ENGINE_PROGRAMS, ZONE_ROLES } from './engine/zones.mjs';
+
+    const FAM_NOW = { dwell:'起居 / 卧 / 客 / 梳妆', make:'书库 / 办公 / 工作室', cook:'厨房 / 咖啡 / 烘焙',
+                      shop:'店铺 / 花店', gather:'游戏 / 屋顶 / 温室', service:'无' };
+    const FNS = FN_FAMILIES.map(f => ({
+      id: f.id, name: f.cn, n: String(FUNCTIONS.filter(x => x.fam === f.id).length),
+      now: FAM_NOW[f.id] || '—',
+      items: FUNCTIONS.filter(x => x.fam === f.id).map(x => x.cn),
+    }));
+    const KITS = KIT_CATS.map(c => ({
+      name: c.cn,
+      items: ENGINE_KITS.filter(k => k.cat === c.id).map(k => k.cn),
+    }));
+    const PROGRAMS = ENGINE_PROGRAMS.map((p, i) => ({ id: i, name: p.cn, hint: p.hint }));
+
+    document.getElementById('live-pills').innerHTML = [
+      `引擎已落地：${FUNCTIONS.length} 种功能 · ${FN_FAMILIES.length} 族`,
+      `套件库：${KIT_CATS.length} 大类 · ${ENGINE_KITS.length} 件`,
+      `布置程序 ${ENGINE_PROGRAMS.length} 套 · 区域角色 ${ZONE_ROLES.length} 个`,
+      `本页数字实时读引擎，不是手写`,
+    ].map(t => `<span class="pill">${t}</span>`).join('');
+
+    import('./engine/index.mjs').then(m => {
+      document.getElementById('ver').textContent = '· 引擎 v' + m.COSMOPOLIS_VERSION;
+      console.log('COSMOPOLIS v' + m.COSMOPOLIS_VERSION);
+    });
+
     const ZONES = [
       { id: "win", name: "窗墙", cls: "z-win", kits: "窗、花箱、帘、窗下暖气或矮柜", people: "可站一人望街，不设座", role: "建筑 + 绿植 + 织物" },
       { id: "media", name: "媒介墙", cls: "", kits: "电视或通高架、画、唱片、落地灯避开主区", people: "不坐在这里，只经过", role: "媒介 + 收纳" },
@@ -347,7 +359,7 @@
       const d = document.createElement("details");
       d.className = "fam";
       d.open = f.id === "dwell";
-      d.innerHTML = `<summary>${f.name} · ${f.items.length} 个功能 <em>现在：${f.now}</em></summary><div class="body">${f.items.map((x,i) => `<span class="chip${i<3 && f.id!=="service" ? " now" : ""}">${x}</span>`).join("")}</div>`;
+      d.innerHTML = `<summary>${f.name} · ${f.items.length} 个功能 <em>升级前只有：${f.now}</em></summary><div class="body">${f.items.map((x) => `<span class="chip now">${x}</span>`).join("")}</div>`;
       fnBox.appendChild(d);
     });
 
