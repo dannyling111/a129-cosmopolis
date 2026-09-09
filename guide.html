@@ -150,7 +150,6 @@
         <a href="#clone">复制</a>
         <a href="#phases">顺序</a>
         <a href="./studio.html" style="color:var(--accent);font-weight:600">沙盘 ↗</a>
-        <a href="./" style="color:var(--accent);font-weight:600">玩偶屋 ↗</a>
       </nav>
     </div>
   </header>
@@ -305,8 +304,20 @@
         <div class="step"><strong>2 · 克隆 48 间</strong> ✅<br />不止四间：48 个功能共用同一张区域角色表，只换套件族与人物脚本。判据：48 × 5 个种子 = 240 间房逐间过体检。</div>
         <div class="step"><strong>3 · 套件库扩容</strong> ✅<br />12 大类按指引原名建库；碰撞盒和座位口袋跟着零件走，不跟房间走。人是从家具自带的口袋里长出来的。</div>
         <div class="step"><strong>4 · 社区规则</strong> ✅<br />层带、相邻、对外比例、街道行人写进 <code>assemble()</code>，在<b>抽房间的时候</b>生效。判据：20 个种子各抽一栋楼逐条核。</div>
-        <div class="step" style="border-color:var(--accent)"><strong>下一步 · 还没做的</strong><br />零件目前用色块代表大类（看得出「这是座具还是灯」，但不是成品家具模型）；门窗洞口只做了外墙那一面；楼与楼之间还没连成街区。</div>
+        <div class="step"><strong>5 · 家具与人物成型</strong> ✅<br />零件不再是色块：193 件各有多部件造型；人物骨架原点落到脚底，坐姿按椅面高度反解小腿角。判据：<code>tests/ground_check.mjs</code> 逐人量脚底离地。</div>
+        <div class="step"><strong>6 · 画风融合</strong> ✅<br />把首页那版<b>剖楼玩偶屋</b>的画风接进来：整栋按一座<b>城市皮肤</b>收敛配色、面向观众那一面<b>整面剖开</b>不再隔玻璃、楼板与竖柱把房间绑成一栋楼、白天／黄昏／夜晚三态。判据：<code>tests/skin_check.mjs</code>（统一到什么程度、还分不分得出房间、六座城是不是真不一样、墙地会不会糊，每条都配了坏样本先证明它会红）。</div>
+        <div class="step" style="border-color:var(--accent)"><strong>下一步 · 还没做的</strong><br />楼与楼之间还没连成街区；家具还是纯色面，没有木纹布纹书脊这类<b>材质</b>；室内没有真正的间接光（现在靠环境光近似）。</div>
       </div>
+    </section>
+
+    <section id="fusion">
+      <h2>两个版本，怎么合的</h2>
+      <p class="sec">这个仓库里同时躺着两版 CosmoPolis：首页是另一个窗口做的<b>剖楼玩偶屋</b>（房间是手工摆的，一间一间调出来的，好看在<b>画风</b>）；本页背后是<b>量化引擎</b>（房间是算出来的，给个种子就能长出无穷多间，强在<b>规模与可验收</b>）。两边的短板正好是对方的长板，所以合的不是页面，是分工——</p>
+      <div class="grid-2">
+        <div class="card"><strong>数据层还是引擎的</strong><p class="sec">社区规则 → 功能 → 区域 → 套件 → 人物，五层一层不跳，全部由 <code>engine/</code> 算。画风层一个布局字节都碰不到，所以换城市、换时段，房间的排布分毫不动。</p></div>
+        <div class="card"><strong>画风层是那一版的</strong><p class="sec">大面积的墙压进一座城市的色相窄带（整栋像一栋楼），小面积的强调色几乎不动（每间房还有性格）；地板强制比墙暗一档；剖面整面敞开；楼板＋竖柱＋山墙＋顶檐把房间绑成建筑；三个时段换四盏灯与曝光，零重建。</p></div>
+      </div>
+      <p class="sec">一句话：<b>它管好看，我管长得出来。</b>合完之后同一个种子能在六座城市 × 三个时段里各活一遍，而每一版都还过得了同一套体检。</p>
     </section>
 
     <footer>

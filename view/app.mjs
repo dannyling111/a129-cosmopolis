@@ -14,7 +14,9 @@ import { BAND_RULES, ADJACENCY } from '../engine/city.mjs';
 import { ROLE_CN, ROLE_IDS, PROGRAM_CN, PROGRAMS } from '../engine/zones.mjs';
 import { stepActors } from '../engine/actors.mjs';
 import { createStage, orbit, buildRoom, buildStreet, buildBillboard, syncPeople, syncStreet,
-         setKitLookup, setPropBuilder, CAT_COLOR, ZONE_COLOR } from './render3d.mjs';
+         setKitLookup, setPropBuilder, CAT_COLOR, ZONE_COLOR,
+         applySkin, buildShell, buildSkyline, setSkylineTime } from './render3d.mjs';
+import { CITY_SKINS, SKIN_IDS, TIMES, TIME_IDS } from './cityskin.mjs';
 import { drawPlan, hitZone } from './plan2d.mjs';
 
 const $ = s => document.querySelector(s);
@@ -30,6 +32,12 @@ try {
 } catch (e) { console.warn('造型包没装上,退回色块显示:', e.message); }
 const stage = createStage($('#view'));
 let B = null, roomGroups = [], street = null, sel = null, selZone = 'main', playing = true, showZones = false;
+// 🎨 画风:城市皮肤 + 时段。两个都只影响【看起来怎么样】,一个字节的布局数据都不动。
+let skinId = localStorage.getItem('cp.skin') || 'paris';
+let timeId = localStorage.getItem('cp.time') || 'day';
+if (!SKIN_IDS.includes(skinId)) skinId = 'paris';
+if (!TIME_IDS.includes(timeId)) timeId = 'day';
+let skyline = null;
 
 const cam = orbit($('#view'), stage.camera, { onTap: pickRoom, pitch: 0.22, yaw: -0.36 });
 
@@ -40,6 +48,14 @@ function resize() {
   stage.camera.updateProjectionMatrix();
 }
 addEventListener('resize', () => { resize(); fitAll(); });
+// 🔴 只挂 window 的 resize 是不够的:开工时先跑 resize(),那一刻下面的资料面板还是空的、
+//    画面区有 691px 高;等面板填上内容,画面区缩到 308px —— 而 window 根本没 resize 过,
+//    于是相机的宽高比一直停在 390/691=0.56,画出来的楼被竖着挤扁、上下各切掉一截。
+//    (实测:诊断钩子报 aspect 0.564,而画布真身是 390×308=1.27。)
+//    正确做法是盯【画面区这个元素】的尺寸,不是盯窗口。
+let _rz = 0;
+new ResizeObserver(() => { clearTimeout(_rz); _rz = setTimeout(() => { resize(); fitAll(); }, 60); })
+  .observe($('#view').parentElement);
 
 function build() {
   const seed = $('#seed').value.trim() || 'cosmopolis';
@@ -48,13 +64,16 @@ function build() {
   B = assemble({ seed, levels, bays });
 
   stage.world.clear(); roomGroups = [];
+  stage.world.add(buildShell(B, skinId));  // 先立外壳:楼板+柱子+山墙,把房间绑成一栋楼
   B.floors.forEach(f => f.rooms.forEach(r => {
-    const g = buildRoom(r, f, r.x, showZones);
+    const g = buildRoom(r, f, r.x, showZones, skinId);
     stage.world.add(g); roomGroups.push(g);
   }));
-  street = buildStreet(B); stage.world.add(street);
+  street = buildStreet(B, skinId); stage.world.add(street);
+  skyline = buildSkyline(B, skinId); stage.world.add(skyline);
   stage.world.add(buildBillboard(B));      // 侧墙大广告牌(参考图里那块)
   stage.world.position.x = -B.width / 2;
+  paintSkin();
 
   fitAll();
   sel = null; selZone = 'main';
@@ -64,6 +83,42 @@ function build() {
   $('#hudStat').textContent = `本栋 ${B.stats.distinctFn} 种功能 · ${B.stats.items} 件套件 · ${B.stats.actors} 个人 ｜ 库里 ${FUNCTIONS.length} 种`;
   $('#hudPick').textContent = '点一间房看它的五块区域';
   renderAll();
+}
+
+/** 把当前皮肤+时段应用到已经建好的场景上(不重建几何体) */
+function paintSkin() {
+  applySkin(stage, skinId, timeId);
+  if (skyline) setSkylineTime(skyline, timeId);
+  document.querySelectorAll('[data-skin]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.skin === skinId)));
+  document.querySelectorAll('[data-time]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.time === timeId)));
+  const el = $('#skinNote');
+  if (el) el.textContent = `${CITY_SKINS[skinId].name} · ${CITY_SKINS[skinId].sub} ｜ ${TIMES[timeId].name}`;
+}
+export function setSkin(id) {
+  if (!SKIN_IDS.includes(id) || id === skinId) return;
+  skinId = id; localStorage.setItem('cp.skin', id);
+  build();                       // 外壳/墙色是几何体上的颜色,要重建;布局不变(同种子)
+}
+export function setTime(id) {
+  if (!TIME_IDS.includes(id)) return;
+  timeId = id; localStorage.setItem('cp.time', id);
+  paintSkin();                   // 时段只改灯光,零重建
+}
+window.__COSMO_SKIN__ = { setSkin, setTime, get skin() { return skinId; }, get time() { return timeId; } };
+
+/** 画风条:一行城市、一行时段。全部是手指按钮,界面上不出现任何键鼠话术。 */
+function buildSkinBar() {
+  const sr = $('#skinRow'), tr = $('#timeRow');
+  if (!sr || !tr) return;
+  sr.innerHTML = SKIN_IDS.map(id =>
+    `<button type="button" data-skin="${id}" aria-pressed="false">${CITY_SKINS[id].name}</button>`).join('');
+  tr.innerHTML = TIME_IDS.map(id =>
+    `<button type="button" data-time="${id}" aria-pressed="false">${TIMES[id].name}</button>`).join('');
+  const bar = sr.closest('.skinbar');
+  bar.addEventListener('click', e => {
+    const s = e.target.closest('[data-skin]'); if (s) return setSkin(s.dataset.skin);
+    const t = e.target.closest('[data-time]'); if (t) return setTime(t.dataset.time);
+  });
 }
 
 function pickRoom(pt) {
@@ -213,9 +268,24 @@ $('#tFit').addEventListener('click', fitAll);
 function fitAll() {
   if (!B) return;
   const hTot = (B.levels + 1) * B.floorH;
-  // 贴近一点:主席要看清房间里的细节,楼太小等于白做
-  cam.fit(new THREE.Vector3(0, hTot * 0.52, B.depth * 0.28), B.width + 1.0, hTot + 1.0, 1.02);
+  // 画风条已经挪进下面的资料区,不再压画面;剩下要躲的只有左上角那几个状态条。
+  // 🔴 净空不许写死像素:换台手机高度就不一样。做法 = 真量它,按占画面的比例留空。
+  const rect = $('#view').parentElement.getBoundingClientRect();
+  const hudH = ($('.hud')?.getBoundingClientRect().height || 0) + 14;
+  const eat = Math.min(0.30, hudH / Math.max(200, rect.height));    // 被状态条挡掉的画面占比
+  const spanH = (hTot + 1.2) / (1 - eat);
+  // 状态条在【左上角】,所以要把楼整体往下推 → 相机瞄得高一点(瞄哪儿哪儿落在画面正中)。
+  cam.fit(new THREE.Vector3(0, hTot * 0.52 + hTot * eat * 0.45, B.depth * 0.28), B.width + 1.2, spanH, 1.05);
 }
+
+// 诊断钩子:相机到底站在哪、看多远 —— 判"楼装不装得下"只能量,不能猜
+window.__COSMO_DIAG__ = () => ({
+  fov: stage.camera.fov, aspect: +stage.camera.aspect.toFixed(3),
+  dist: +cam.st.dist.toFixed(2), target: cam.st.target.toArray().map(v => +v.toFixed(2)),
+  pos: stage.camera.position.toArray().map(v => +v.toFixed(2)),
+  hTot: B ? +((B.levels + 1) * B.floorH).toFixed(2) : 0, width: B ? B.width : 0,
+  canvas: [$('#view').clientWidth, $('#view').clientHeight],
+});
 
 // ---------------- 主循环 ----------------
 let last = performance.now();
@@ -232,7 +302,7 @@ function loop(now) {
 
 // 版本印:线上是哪一版,打开控制台或看体检页就知道,不靠猜(Rule-ONESITE-001)
 console.log('COSMOPOLIS v' + COSMOPOLIS_VERSION);
-resize(); build(); requestAnimationFrame(loop);
+buildSkinBar(); resize(); build(); requestAnimationFrame(loop);
 // ── 运行时探针:给机器闸用,不是给界面用 ──────────────────────────
 // 🔴 主席一眼看出「人物浮在空中」,而当时所有引擎判据都是绿的 ——
 //    因为它们判的是家具落位,没有一条在看【人的脚在哪】。这个探针就是补上那只眼睛:

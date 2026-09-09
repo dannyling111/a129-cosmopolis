@@ -6,7 +6,7 @@
 // 五层:社区 assemble → 功能 FUNCTIONS → 区域 cutZones → 套件 planRoom → 人物 castRoom
 // ============================================================
 
-export const COSMOPOLIS_VERSION = '1.0.0';
+export const COSMOPOLIS_VERSION = '1.1.0';
 
 export { makeRng, strHash } from './rng.mjs';
 export { cutZones, pullFor, pathIsClear, overlaps, inside,

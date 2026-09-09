@@ -15,7 +15,8 @@ let buildProp = null;
 export function setPropBuilder(fn) { buildProp = fn; }
 import { ROOM_STYLES, CAT_PALETTE, WOOD, METAL, styleOf, propColors } from './palette.mjs';
 import { buildFigure, poseFigure, buildPet, SEAT_Y } from './figure.mjs';
-import { floorTexture, wallTexture, artTexture, skyTexture } from './textures.mjs';
+import { floorTexture, wallTexture, artTexture } from './textures.mjs';
+import { CITY_SKINS, TIMES, harmonize, skylineTowers } from './cityskin.mjs';
 
 export const ZONE_COLOR = { window: 0x6fb7c9, main: 0xff8a5c, aux: 0x9ac96a, walldec: 0xb07ce8, path: 0xd9d2c4 };
 /** 12 大类的代表色(界面图例用;三维里用 palette 的每件随机色) */
@@ -34,28 +35,76 @@ const mat = (hex, o = {}) => {
 const texMat = (t, o = {}) => new THREE.MeshLambertMaterial({ map: t, ...o });
 const box = (w, h, d, hex, o) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(hex, o));
 const put = (m, x, y, z) => { m.position.set(x, y, z); return m; };
+const mixHex = (a, b, k) => {
+  const ch = (v, sh) => (v >> sh) & 255;
+  return [16, 8, 0].reduce((acc, sh) => (acc << 8) | Math.round(ch(a, sh) * (1 - k) + ch(b, sh) * k), 0);
+};
 const rngOf = (n) => { let s = (n * 2654435761) >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); };
 
 export function createStage(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  // 🎨 融合点①:色调映射 + 曝光。同样的颜色,过不过这一步,出来是"插画"还是"三维软件截图"。
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.08;
+  // 🎨 融合点②:开阴影。参考图里每件家具都有一小片柔影把它按在地板上,
+  //             没有影子的东西看着就是"浮"的 —— 和主席上一轮说的人物浮空是同一种病。
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
   const scene = new THREE.Scene();
+  // 🎨 融合点③:天空用纯色 + 同色雾(不再用天空球贴图)——
+  //             这样黄昏/夜晚只要换一个颜色,整张图的气氛就跟着换。
+  scene.background = new THREE.Color(0xbfd9ee);
+  scene.fog = new THREE.Fog(0xd7e6f2, 46, 168);
 
-  // 大晴天:天空球 + 远处淡蓝雾(参考图全是明亮户外)
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(320, 24, 16), new THREE.MeshBasicMaterial({ map: skyTexture(), side: THREE.BackSide }));
-  scene.add(sky);
-  scene.fog = new THREE.Fog(0xcfe6f7, 55, 190);
+  // 🎨 融合点④:fov 34 的长焦。透视被压平,竖线接近平行,才有剖面插画的味道;
+  //             45 度广角会把楼"撑开",怎么调色都像游戏截图。
+  const camera = new THREE.PerspectiveCamera(34, 1, 0.3, 900);
 
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 600);
-  scene.add(new THREE.HemisphereLight(0xfff8ec, 0x9fb08a, 1.15));   // 天光偏暖,地面反光偏绿(草地)
-  // 房间是封顶的,太阳照不进去 —— 不补一层环境光,屋里就会灰扑扑的,
-  // 而参考图里屋里比屋外还亮。这一层专门喂室内。
-  scene.add(new THREE.AmbientLight(0xfff4e2, 0.55));
-  const sun = new THREE.DirectionalLight(0xfff0d0, 0.95); sun.position.set(16, 26, 18); scene.add(sun);
-  const fill = new THREE.DirectionalLight(0xbfd8ff, 0.34); fill.position.set(-14, 10, -12); scene.add(fill);
+  const hemi = new THREE.HemisphereLight(0xe8f4ff, 0x9fb08a, 1.05); scene.add(hemi);
+  const amb  = new THREE.AmbientLight(0xfff4e2, 0.55); scene.add(amb);
+  const sun  = new THREE.DirectionalLight(0xfff3dc, 1.20); sun.position.set(16, 26, 14);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -40; sun.shadow.camera.right = 40;
+  sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -18;
+  sun.shadow.camera.near = 1; sun.shadow.camera.far = 130;
+  sun.shadow.bias = -0.0012; sun.shadow.normalBias = 0.02;
+  scene.add(sun); scene.add(sun.target);
+  const fill = new THREE.DirectionalLight(0xb8d4ea, 0.28); fill.position.set(-14, 8, -10); scene.add(fill);
 
   const world = new THREE.Group(); scene.add(world);
-  return { renderer, scene, camera, world, sun };
+  const stage = { renderer, scene, camera, world, sun, fill, hemi, amb, skin: 'paris', time: 'day' };
+  applySkin(stage, 'paris', 'day');
+  return stage;
+}
+
+/**
+ * 换城市皮肤 / 换时段。只改灯光、天空、雾和屋内灯的亮度 —— 一个几何体都不重建。
+ * 引擎数据完全不参与,所以随便切,布局不会变。
+ */
+export function applySkin(stage, skinId, timeId) {
+  const skin = CITY_SKINS[skinId] || CITY_SKINS.paris;
+  const T = TIMES[timeId] || TIMES.day;
+  stage.skin = skin.id; stage.time = T.id;
+  stage.scene.background.setHex(skin[T.sky]);
+  stage.scene.fog.color.setHex(skin[T.fog]);
+  stage.scene.fog.near = T.fogNear; stage.scene.fog.far = T.fogFar;
+  stage.hemi.color.setHex(T.hemiSky); stage.hemi.groundColor.setHex(skin.ground); stage.hemi.intensity = T.hemi;
+  stage.amb.intensity = T.amb;
+  stage.sun.color.setHex(T.key); stage.sun.intensity = T.keyI; stage.sun.position.set(...T.keyPos);
+  stage.fill.color.setHex(T.fill); stage.fill.intensity = T.fillI; stage.fill.position.set(...T.fillPos);
+  stage.renderer.toneMappingExposure = T.exposure;
+  // 屋内吊灯:白天全灭,黄昏半亮,夜里全开(治愈感的一大半在这里)
+  stage.world.traverse(o => {
+    if (o.isLight && o.userData.lampBase !== undefined) o.intensity = o.userData.lampBase * T.lamps;
+    if (o.userData.bulb) o.material = o.userData.bulbMats[T.lamps > 0.3 ? 1 : 0];
+    if (o.userData.streetLamp) o.intensity = o.userData.lampBase * (T.lamps > 0 ? 1 : 0.12);
+    if (o.userData.windowGlass) { o.material.color.setHex(T.lamps > 0.3 ? 0xffe2a8 : 0xbfe4f5); o.material.opacity = T.lamps > 0.3 ? 0.62 : 0.28; }
+  });
+  return stage;
 }
 
 /** 触屏轨道:一指转、两指缩放。界面上不出现任何键鼠话术。 */
@@ -111,10 +160,13 @@ const T = 0.10;          // 墙厚
 const SILL = 0.85;       // 窗台高
 const HEADER = 2.35;     // 窗顶高
 
-export function buildRoom(room, floor, xOff, showZones) {
+export function buildRoom(room, floor, xOff, showZones, skinId = 'paris') {
   const g = new THREE.Group();
   const p = room.plan, h = p.h;
-  const S = styleOf(room.fn);
+  // 🎨 融合点⑤:房间自己的配色先算出来,再【整栋按同一个城市皮肤收敛】。
+  //    墙压进城市色相的 ±36° 窄带 → 一整栋看过去是一栋楼;
+  //    强调色几乎不动 → 每间房还是各有各的性格(主席上一轮要的"风格各异"没丢)。
+  const S = harmonize(styleOf(room.fn), skinId);
   const rand = rngOf(floor.level * 977 + room.bay * 131 + room.fn.length);
   g.position.set(xOff, floor.y, 0);
   g.userData.room = room;
@@ -152,44 +204,57 @@ export function buildRoom(room, floor, xOff, showZones) {
     g.add(put(box(0.025, 0.42, 0.025, 0x6b5f52), lx, h - 0.21, lz));
     const shade = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.22, 12), mat(S.accent));
     shade.rotation.x = Math.PI; g.add(put(shade, lx, h - 0.50, lz));
-    g.add(put(new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), mat(0xfff3c4)), lx, h - 0.60, lz));
-    const lamp = new THREE.PointLight(S.mood === 'neon' ? 0xff7ae0 : 0xffe4b8, S.mood === 'neon' ? 0.85 : 0.70, 8.5);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), mat(0x8f8a78));
+    bulb.userData.bulb = true;
+    bulb.userData.bulbMats = [mat(0x8f8a78), new THREE.MeshBasicMaterial({ color: 0xfff3c4 })];
+    g.add(put(bulb, lx, h - 0.60, lz));
+    const lamp = new THREE.PointLight(S.mood === 'neon' ? 0xff7ae0 : 0xffd9a0, 0, 11);
+    // 0.8 那一版夜里屋里只是"没那么黑",不是"亮着灯";参考图里夜晚每间房是暖橙色的发光盒子。
+    lamp.userData.lampBase = S.mood === 'neon' ? 1.9 : 1.7;     // 由 applySkin 按时段点亮
     g.add(put(lamp, lx, h - 0.7, lz));
 
-    // ── 外墙:窗下墙 + 窗上梁 + 窗框竖挺 + 窗台 + 帘子 + 窗外花箱
-    g.add(put(box(p.w, SILL, T, S.wall), p.w / 2, SILL / 2, p.d + T / 2));
-    g.add(put(box(p.w, Math.max(0.1, h - HEADER), T, S.wall), p.w / 2, h - (h - HEADER) / 2, p.d + T / 2));
-    g.add(put(box(p.w, 0.06, 0.20, S.trim), p.w / 2, SILL + 0.03, p.d + 0.02));            // 窗台板
-    const bays = Math.max(2, Math.round(p.w / 1.6));
-    for (let i = 0; i <= bays; i++)
-      g.add(put(box(0.07, HEADER - SILL, 0.07, S.trim), (i / bays) * p.w, (SILL + HEADER) / 2, p.d + T / 2));
-    // 玻璃(淡蓝半透,远看有反光感)
-    const glass = new THREE.Mesh(new THREE.PlaneGeometry(p.w, HEADER - SILL), new THREE.MeshLambertMaterial({ color: 0xbfe4f5, transparent: true, opacity: 0.28 }));
-    g.add(put(glass, p.w / 2, (SILL + HEADER) / 2, p.d + T * 0.55));
-    // 两侧窗帘
-    [0.14, p.w - 0.14].forEach(x => g.add(put(box(0.26, HEADER - SILL + 0.14, 0.06, S.accent), x, (SILL + HEADER) / 2 + 0.05, p.d - 0.06)));
-    // 窗外花箱 + 花(参考图里几乎每扇窗下都有)
-    const bw = Math.min(p.w * 0.6, 1.6);
-    g.add(put(box(bw, 0.22, 0.26, 0xb5794a), p.w / 2, SILL + 0.11, p.d + 0.22));
-    for (let i = 0; i < 5; i++) {
-      const c = [0xff5d7a, 0xffd34e, 0xff8a3d, 0xe86af0, 0xfff1f0][i % 5];
-      g.add(put(box(0.10, 0.10, 0.10, c), p.w / 2 - bw / 2 + 0.16 + i * (bw - 0.32) / 4, SILL + 0.28, p.d + 0.22));
+    // ── 🎨 融合点⑥【剖面开口】:面向观众的这一面【整面拆掉】,不留墙、不留玻璃。
+    //    这是和另一个项目、也和参考插画差得最远的一处 —— 我原来在这一面装了整幅玻璃幕墙,
+    //    于是所有房间都是"隔着一层毛玻璃看进去"的:夜里灯一亮,玻璃反而更挡人。
+    //    参考图和那一版的做法是【把这一面直接切掉】(剖楼玩偶屋的"剖"就在这儿),
+    //    看进去是通透的,家具和人是直接露出来的。开口边上只留三样东西提示"这里原本是外墙":
+    //      · 楼板挑檐(把切口封个边,不然像被撕开的纸)
+    //      · 及腰栏杆(住人的层才有 —— 底商是敞开的店面,不该有栏杆)
+    //      · 花箱(参考图里几乎每个开口边都有,是"有人住"最便宜的信号)
+    const edgeZ = p.d + 0.06;
+    g.add(put(box(p.w, 0.12, 0.34, S.trim), p.w / 2, 0.06, edgeZ + 0.10));          // 切口封边
+    const bw = Math.min(p.w * 0.52, 1.5);
+    if (floor.band !== 'ground') {
+      // 及腰栏杆(玻璃栏板 + 扶手 + 立柱):挡不住视线,但一眼就知道这是几层楼上
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(p.w, 0.62, 0.05),
+        new THREE.MeshLambertMaterial({ color: 0xdff0f6, transparent: true, opacity: 0.30 }));
+      g.add(put(rail, p.w / 2, 0.34, edgeZ + 0.16));
+      g.add(put(box(p.w, 0.06, 0.11, S.trim), p.w / 2, 0.68, edgeZ + 0.16));         // 扶手
+      const posts = Math.max(3, Math.round(p.w / 1.5));
+      for (let i = 0; i <= posts; i++)
+        g.add(put(box(0.05, 0.66, 0.05, S.trim), (i / posts) * p.w, 0.35, edgeZ + 0.16));
+      // 花箱挂在栏杆外侧
+      g.add(put(box(bw, 0.20, 0.22, 0xb5794a), p.w * 0.5, 0.30, edgeZ + 0.30));
+      g.add(put(box(bw - 0.06, 0.10, 0.17, 0x4f9a52), p.w * 0.5, 0.44, edgeZ + 0.30));
+      for (let i = 0; i < 5; i++)
+        g.add(put(box(0.09, 0.09, 0.09, [0xff5d7a, 0xffd34e, 0xff8a3d, 0xe86af0, 0xfff1f0][i % 5]),
+          p.w * 0.5 - bw / 2 + 0.15 + i * (bw - 0.30) / 4, 0.52, edgeZ + 0.30));
     }
-    g.add(put(box(bw - 0.08, 0.10, 0.20, 0x4f9a52), p.w / 2, SILL + 0.24, p.d + 0.22));
-
-    // ── 住人的层给个小阳台(参考图里阳台是"有人住"的最强信号)
-    if (floor.band !== 'ground' && rand() > 0.35) {
-      const by = 0;
-      g.add(put(box(p.w * 0.62, 0.10, 0.85, S.trim), p.w / 2, by + 0.05, p.d + 0.60));
-      for (let i = 0; i <= 6; i++)
-        g.add(put(box(0.035, 0.52, 0.035, 0x8d8272), p.w / 2 - p.w * 0.31 + i * (p.w * 0.62) / 6, by + 0.36, p.d + 1.00));
-      g.add(put(box(p.w * 0.62, 0.05, 0.05, 0x8d8272), p.w / 2, by + 0.62, p.d + 1.00));
-      g.add(put(box(0.34, 0.30, 0.30, 0xc98a5c), p.w / 2 - p.w * 0.24, by + 0.20, p.d + 0.75));
-      g.add(put(box(0.30, 0.34, 0.26, 0x5fae5a), p.w / 2 - p.w * 0.24, by + 0.50, p.d + 0.75));
-    }
+    // ── 背景墙上开真窗洞:光从楼背面透进来,屋里才有"里外"关系,不是个封死的盒子
+    const winW = Math.min(p.w * 0.42, 1.7), winH = HEADER - SILL - 0.25;
+    const wx = p.w * (0.24 + rand() * 0.5);
+    const sky = new THREE.Mesh(new THREE.PlaneGeometry(winW, winH),
+      new THREE.MeshBasicMaterial({ color: 0xbfe4f5 }));
+    sky.userData.windowGlass = true;
+    g.add(put(sky, wx, SILL + winH / 2 + 0.1, 0.012));   // 贴在背景墙【室内那一面】上,不能塞进墙体里(会被墙面挡住)
+    g.add(put(box(winW + 0.14, 0.07, 0.07, S.trim), wx, SILL + 0.06, 0.035));         // 窗台
+    g.add(put(box(winW + 0.14, 0.07, 0.07, S.trim), wx, SILL + winH + 0.16, 0.035));
+    [-1, 1].forEach(sx => g.add(put(box(0.06, winH + 0.22, 0.07, S.trim), wx + sx * (winW / 2 + 0.05), SILL + winH / 2 + 0.1, 0.035)));
+    // 窗帘(背景墙上的,不挡剖面)
+    [-1, 1].forEach(sx => g.add(put(box(0.20, winH + 0.20, 0.06, S.accent), wx + sx * (winW / 2 + 0.16), SILL + winH / 2 + 0.12, 0.06)));
   } else {
     // 屋顶层:女儿墙 + 花池
-    g.add(put(box(p.w, 1.05, T, S.trim), p.w / 2, 0.52, p.d + T / 2));
+    g.add(put(box(p.w, 0.42, T, S.trim), p.w / 2, 0.21, p.d + T / 2));   // 朝观众这面压低到 0.42m,否则整个露台被挡住
     g.add(put(box(p.w, 1.05, T, S.trim), p.w / 2, 0.52, -T / 2));
     for (let i = 0; i < 3; i++) {
       const x = p.w * (0.2 + i * 0.3);
@@ -231,6 +296,8 @@ export function buildRoom(room, floor, xOff, showZones) {
   });
   g.userData.people = people;
   g.userData.style = S;
+  // 阴影:家具投影、墙地受影。没有这一步,家具再精细也是"贴"在地上的。
+  g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   return g;
 }
 
@@ -277,16 +344,18 @@ function lowFigure(n) {                                   // 街上的行人离�
   return g;
 }
 
-export function buildStreet(b) {
+export function buildStreet(b, skinId = 'paris') {
+  const skin = CITY_SKINS[skinId] || CITY_SKINS.paris;
   const g = new THREE.Group();
   const W = b.width, D = b.depth;
   const rnd = rngOf(9173);
   // 大地:草地贴图(参考图里楼就长在公园边上)
   // 大地铺得足够远,靠雾把边缘化进天空 —— 不然会看到一条生硬的"地平线切口"
-  const ground = new THREE.Mesh(new THREE.BoxGeometry(W + 420, 0.06, 420), texMat(floorTexture('grass', 0x8cc06a, 0x6ea854, 160)));
+  const gA = skin.ground, gB = mixHex(skin.ground, 0x000000, 0.14);
+  const ground = new THREE.Mesh(new THREE.BoxGeometry(W + 420, 0.06, 420), texMat(floorTexture('grass', gA, gB, 160)));
   g.add(put(ground, W / 2, -0.24, D + 6));
   g.add(put(box(W + 34, 0.16, 9.5, 0x9c968a), W / 2, -0.08, D + 7.2));                     // 路面
-  g.add(put(box(W + 34, 0.30, 3.4, 0xe4dcc9), W / 2, -0.02, D + 1.7));                    // 人行道
+  g.add(put(box(W + 34, 0.30, 3.4, skin.sidewalk), W / 2, -0.02, D + 1.7));               // 人行道
   // 斑马线
   for (let i = 0; i < 8; i++) g.add(put(box(0.5, 0.02, 2.4, 0xfffdf6), W * 0.5 - 2 + i * 0.62, 0.02, D + 7.2));
 
@@ -294,7 +363,9 @@ export function buildStreet(b) {
     const x = (i + 0.5) / b.street.lamps * (W + 18) - 9;
     g.add(put(box(0.13, 4.2, 0.13, 0x4e5a58), x, 2.1, D + 3.0));
     g.add(put(box(0.5, 0.16, 0.3, 0xffe9a8), x, 4.25, D + 3.0));
-    const glow = new THREE.PointLight(0xffd98a, 0.22, 8); g.add(put(glow, x, 3.9, D + 3.0));
+    const glow = new THREE.PointLight(0xffd98a, 0.22, 11);
+    glow.userData.streetLamp = true; glow.userData.lampBase = 1.5;
+    g.add(put(glow, x, 3.9, D + 3.0));
   }
   for (let i = 0; i < b.street.trees; i++) {
     const x = (i + 0.5) / b.street.trees * (W + 16) - 8 + rnd() * 1.2;
@@ -323,6 +394,8 @@ export function buildStreet(b) {
     peds.add(f);
   }
   g.add(peds); g.userData.peds = peds; g.userData.W = W;
+  g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  ground.castShadow = false;                       // 大地只接影,不投影(不然自遮挡出条纹)
   return g;
 }
 
@@ -363,4 +436,112 @@ export function buildBillboard(b) {
   for (const dy of [-bh * 0.35, bh * 0.35])
     g.add(put(box(0.5, 0.09, 0.09, 0x5a5f6a), b.width + 0.12, bh / 2 + H * 0.28 + dy, b.depth * 0.45));
   return g;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🏗️ buildShell —— 【剖楼外壳】:把并排的房间绑成"一栋被切开的楼"
+//
+// 这是画风融合里改动最大、也最值的一块。原来 15 间房是 15 个独立盒子并排 ——
+// 看着像货架。参考图和另一个项目里,楼之所以是"楼",靠的是三样【房间之外】的东西:
+//   · 楼板 slab   —— 每层之间一道水平厚板,把这一层的房间在视觉上串成一条
+//   · 竖柱 pier   —— 开间之间一根通高的柱子,把楼板在竖向上钉住
+//   · 外檐/基座/顶檐 —— 让这栋楼有"上下两头",不是一截被切断的管子
+// 少了它们,再精细的室内也拼不成一栋建筑。
+// ═══════════════════════════════════════════════════════════════════════════
+export function buildShell(b, skinId = 'paris') {
+  const skin = CITY_SKINS[skinId] || CITY_SKINS.paris;
+  const g = new THREE.Group();
+  const W = b.width, D = b.depth, H = (b.levels + 1) * b.floorH;
+
+  // 基座:楼比地面高出一截,才有"落在地上"的分量
+  g.add(put(box(W + 1.1, 0.55, D + 1.3, skin.base), W / 2, -0.28, D / 2 - 0.1));
+  g.add(put(box(W + 1.35, 0.18, D + 1.5, skin.facadeTrim), W / 2, -0.60, D / 2 - 0.1));
+
+  // 每层楼板(挑出室内 0.22m,形成一道阴影线 —— 剖面插画全靠这道线分层)
+  for (let lv = 0; lv <= b.levels; lv++) {
+    const y = lv * b.floorH;
+    g.add(put(box(W + 0.5, 0.16, D + 0.44, skin.facade), W / 2, y - 0.16, D / 2 + 0.10));
+    g.add(put(box(W + 0.62, 0.07, D + 0.56, skin.facadeTrim), W / 2, y - 0.26, D / 2 + 0.14));
+  }
+
+  // 开间之间的竖柱(含最左最右两根边柱)
+  let x = 0;
+  for (let i = 0; i <= b.bays; i++) {
+    g.add(put(box(0.30, H + 0.30, 0.30, skin.facadeTrim), x, H / 2 - 0.15, D + 0.16));
+    if (i < b.bays) x += b.bayW[i];
+  }
+
+  // 两侧山墙(整栋只有面向相机的一面是敞开的 —— 这就是"剖")
+  g.add(put(box(0.26, H, D + 0.3, skin.facade), -0.13, H / 2, D / 2));
+  g.add(put(box(0.26, H, D + 0.3, skin.facade), W + 0.13, H / 2, D / 2));
+  // 背立面
+  g.add(put(box(W + 0.26, H, 0.22, skin.facade), W / 2, H / 2, -0.24));
+
+  // 顶檐 + 屋脊
+  g.add(put(box(W + 1.0, 0.22, D + 1.1, skin.facadeTrim), W / 2, H + 0.11, D / 2 + 0.05));
+  g.add(put(box(W + 0.7, 0.30, D + 0.8, skin.roof), W / 2, H + 0.37, D / 2 + 0.05));
+
+  // 接触阴影:楼底下一片径向渐隐的软影。太阳阴影管硬的,这片管"贴地"的那种沉。
+  const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+  const c2 = cv.getContext('2d');
+  const gr = c2.createRadialGradient(128, 128, 10, 128, 128, 126);
+  gr.addColorStop(0, 'rgba(0,0,0,0.42)'); gr.addColorStop(0.55, 'rgba(0,0,0,0.16)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  c2.fillStyle = gr; c2.fillRect(0, 0, 256, 256);
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(W + 14, D + 16),
+    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false }));
+  shadow.rotation.x = -Math.PI / 2;
+  g.add(put(shadow, W / 2, -0.66, D / 2 + 1.2));
+  g.traverse(o => { if (o.isMesh && o !== shadow) { o.castShadow = true; o.receiveShadow = true; } });
+  return g;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🌆 buildSkyline —— 远景城市剪影 + 云 + 日月
+// 没有远景时,这栋楼是"悬在空盒子里的模型";有了远景 + 同色雾,它才在一座城里。
+// ═══════════════════════════════════════════════════════════════════════════
+export function buildSkyline(b, skinId = 'paris') {
+  const skin = CITY_SKINS[skinId] || CITY_SKINS.paris;
+  const g = new THREE.Group();
+  const cx = b.width / 2;
+  skylineTowers(skinId).forEach((t, i) => {
+    const m = box(t.w, t.h, t.d, t.c);
+    g.add(put(m, cx + t.x, t.h / 2, t.z));
+    // 夜里亮起来的窗带(只给最近的 12 座,远的看不出来还费性能)
+    if (i < 12) {
+      const win = new THREE.Mesh(new THREE.PlaneGeometry(t.w * 0.62, t.h * 0.42),
+        new THREE.MeshBasicMaterial({ color: 0xf0d9a0, transparent: true, opacity: 0 }));
+      win.userData.windowGlass = false;
+      win.userData.towerWin = true;
+      g.add(put(win, cx + t.x, t.h * 0.58, t.z + t.d / 2 + 0.06));
+    }
+  });
+  // 云(白天才有)
+  const clouds = new THREE.Group(); clouds.userData.clouds = true;
+  [[-42, 34, -60], [26, 30, -66], [58, 32, -48], [-14, 38, -72], [8, 28, -40]].forEach(pz => {
+    const c = new THREE.Group();
+    [[0, 0, 0, 3.4], [3.1, 0.4, 0.5, 2.6], [-2.7, 0.2, 0.4, 2.2]].forEach(([dx, dy, dz, r]) =>
+      c.add(put(new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), mat(0xfffdf8)), dx, dy, dz)));
+    clouds.add(put(c, cx + pz[0], pz[1], pz[2]));
+  });
+  g.add(clouds);
+  // 日/月:同一个球换颜色换位置,由 applySkin 之外的 setSkyBody 管
+  const body = new THREE.Mesh(new THREE.SphereGeometry(2.6, 18, 14), new THREE.MeshBasicMaterial({ color: 0xfff4c8 }));
+  body.userData.skyBody = true;
+  g.add(put(body, cx + 42, 40, -74));
+  g.userData.skyline = true;
+  return g;
+}
+
+/** 远景随时段变:夜里点亮塔楼窗、收起云、把太阳换成月亮 */
+export function setSkylineTime(g, timeId) {
+  const night = timeId === 'night', dusk = timeId === 'dusk';
+  g.traverse(o => {
+    if (o.userData.towerWin) o.material.opacity = night ? 0.55 : dusk ? 0.22 : 0;
+    if (o.userData.clouds) o.visible = !night;
+    if (o.userData.skyBody) {
+      o.material.color.setHex(night ? 0xf4f0e0 : dusk ? 0xf0b27a : 0xfff4c8);
+      o.position.set(o.position.x, night ? 46 : dusk ? 22 : 40, o.position.z);
+      o.scale.setScalar(night ? 1.35 : 1);
+    }
+  });
 }

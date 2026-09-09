@@ -1,0 +1,132 @@
+capsule: 1
+id: cosmopolis
+name: COSMOPOLIS · 量化积木城市引擎(社区→功能→区域→套件→人物)
+aliases:
+- 量化积木城市
+- 室内布局引擎
+- 房间生成
+- 家具布局
+- 五层量化
+- 区域切分
+- 人物脚本
+- 整栋抽房间
+- 社区规则
+- 布置程序
+- 画风融合
+- 城市皮肤
+- 昼夜时段
+- 剖楼外壳
+version: 1.1.0
+summary: 给一个种子,长出一整栋能住人的楼。五层不许跳级——社区规则决定这一层放什么功能,功能决定区域程序,区域决定套件落在哪一块,套件自带的座位口袋决定人坐在哪。零依赖 ES module,node 里直接能跑;渲染是另一层,换渲染器不动引擎。
+kind: code
+runtime: browser-esm
+host:
+  peer: []
+  note: 引擎本体零依赖(node 直接跑);只有 view/render3d.mjs 需要 three,那不属于本封装
+entry: web/terminal/cosmopolis/engine/index.mjs
+exports:
+- name: assemble
+  from: engine/index.mjs
+  what: 第 0 层。按社区规则(层带/相邻/对外比例)抽一整栋楼,每间房都已经排好套件、放好人。90% 情况下你只要调这一个
+  usage: "const b = assemble({ seed:'客厅母模板', levels:4, bays:3 }); // b.floors[].rooms[].plan / .cast"
+- name: planRoom
+  from: engine/index.mjs
+  what: 第 2+3 层。排一间房:切五块区域,再按功能的区域程序把套件落进各自的块里。返回 items(带 box/zone/cat)、seats(座位口袋)、path(通行是否通)
+  usage: "const p = planRoom('living', { seed: 42, program: 'wall' }); // p.zones / p.items / p.seats"
+- name: castRoom
+  from: engine/index.mjs
+  what: 第 4 层。按功能的人物脚本,把人放进一间已排好的房 —— 座位只能从家具自带的口袋里长出来,走路只走通行区
+  usage: "const c = castRoom(p, 'seed'); // c.actors[{state,body,act,x,z,dir}]"
+- name: stepActors
+  from: engine/index.mjs
+  what: 人物运行时推进一帧(坐够了起身走一圈再坐回;吃饭的人坐死不动;忙的人在辅区两三点来回)
+  usage: "stepActors(c, p, dt, 'seed')"
+- name: cutZones
+  from: engine/index.mjs
+  what: 第 2 层单独用。把 w×d 的房切成 窗墙/主区/辅区/墙装/通行 五块;program 换一套,区域角色的位置和大小就换,零件尺寸不动
+  usage: "const z = cutZones({ w:5.4, d:4.6, program:'side' }); // z.roles.main / z.roles.path"
+- name: auditRoom
+  from: engine/index.mjs
+  what: 房内量化体检:家具越界 / 压住通行 / 跨类乱放 / 互相重叠,逐条给出问题句子。给机器闸和界面共用同一套判据
+  usage: "const a = auditRoom(p); if(!a.ok) console.log(a.problems)"
+- name: auditCity
+  from: engine/index.mjs
+  what: 社区体检:层带违规 / 不该相邻的挨在一起 / 临街对外比例不够
+  usage: "const a = auditCity(b); // a.ok / a.problems"
+- name: KITS
+  from: engine/index.mjs
+  what: 12 大类套件库(座具/桌案/睡眠/收纳/厨作/餐吧/灯具/织物/绿植/媒介/建筑/人物)。每件带真实尺寸、允许进哪些区域、座位口袋
+  usage: "KITS.filter(k => k.cat === 'seat')"
+- name: FUNCTIONS
+  from: engine/index.mjs
+  what: 48 个功能 × 6 族,每个带层带、面积区间、五块区域各要什么大类几件、用哪套布置程序、绑哪份人物脚本
+  usage: "FUNCTIONS.find(f => f.id === 'living').zones.main"
+- name: PROGRAMS
+  from: engine/index.mjs
+  what: 4 套布置程序(会客朝向/靠墙沙发/侧向围坐/阅读角落)。它们只改区域角色的几何,绝不改零件尺寸
+  usage: "PROGRAMS.map(p => p.id)   // ['face','wall','side','nook']"
+- name: makeRng
+  from: engine/index.mjs
+  what: 稳定随机。同种子同结果 —— 一座城可复算、可对比、可回归测试,不用 Math.random
+  usage: "const r = makeRng(seed, 'room|living'); r.pick(arr); r.count([1,3])"
+- name: harmonize
+  from: view/cityskin.mjs
+  what: 画风融合层。把一间房的配色按【城市皮肤】重新调和 —— 墙压进城市色相的 ±36° 窄带(整栋像一栋楼)、强调色几乎不动(每间房还有自己的性格)、地板强制比墙暗 0.14(房间才有上浅下深的重量)。引擎数据一个字节都不参与
+  usage: "const S = harmonize(ROOM_STYLES.living, 'paris'); // {wall, accent, trim, floorA, floorB, skin}"
+- name: CITY_SKINS
+  from: view/cityskin.mjs
+  what: 6 座城市皮肤(巴黎/纽约/地中海/热带/东京/北欧)。每座给外壳色、天空三态、雾色、远景塔楼色带,以及房间配色往哪个色相收
+  usage: "CITY_SKINS.nyc.facade   // 砖红外墙"
+- name: TIMES
+  from: view/cityskin.mjs
+  what: 白天/黄昏/夜晚三套光照配方(半球光+环境光+暖主光+冷补光+曝光+雾距+屋内灯亮度)。切时段零重建
+  usage: "TIMES.night.lamps  // 1.0 = 屋内灯全开"
+- name: applySkin
+  from: view/render3d.mjs
+  what: 把皮肤+时段应用到已经建好的场景:改天空、雾、四盏灯、曝光、屋内吊灯亮度。一个几何体都不重建
+  usage: "applySkin(stage, 'nyc', 'night')"
+- name: buildShell
+  from: view/render3d.mjs
+  what: 剖楼外壳 —— 楼板+竖柱+山墙+基座+顶檐+接触阴影。把并排的房间绑成"一栋被切开的楼"(没有它,15 间房看着像货架不像楼)
+  usage: "world.add(buildShell(b, 'paris'))"
+- name: buildSkyline
+  from: view/render3d.mjs
+  what: 远景城市剪影 —— 22 座可复算塔楼 + 云 + 日月;配 setSkylineTime 随时段亮灯/收云/换月
+  usage: "const sk = buildSkyline(b, 'nyc'); setSkylineTime(sk, 'night')"
+- name: capabilities
+  from: engine/index.mjs
+  what: 一行拿到这台引擎现在有多大(功能数/套件数/程序数/脚本数),给页面打版本印或体检报数用
+  usage: "const cap = await capabilities(); // { functions:48, kits:..., programs:4 }"
+adapters:
+- host: 任意网页(自己渲染)
+  how: 只 import engine/index.mjs,拿 assemble() 的数据自己画。引擎不碰 DOM、不碰 three,所以 canvas2D / three / 别的引擎都能接
+  code: "import { assemble } from './engine/index.mjs'; const b = assemble({seed:'x'}); b.floors.forEach(f=>f.rooms.forEach(r=>draw(r.plan.items)));"
+- host: three.js 场景
+  how: 照抄 view/render3d.mjs 的 buildRoom/buildStreet;item.box 是米制占地矩形,item.h 是高度。
+       渲染层还有三个可单独拿走的件:view/figure.mjs(会走会坐、脚真踩地的人物骨架)、
+       view/props.mjs(181 件多部件家具造型)、view/palette.mjs(48 套鲜艳房间配色)、view/textures.mjs(canvas 现画的地板/墙纸/画墙贴图)
+  code: "import { buildRoom, buildStreet } from './view/render3d.mjs'; import { buildFigure, poseFigure } from './view/figure.mjs';"
+- host: node 脚本 / 批量出图
+  how: 引擎零依赖,node 里直接 import 就能批量生成并体检,不需要浏览器
+  code: "node -e \"import('./engine/index.mjs').then(m=>{const b=m.assemble({seed:'s'});console.log(m.auditCity(b))})\""
+example:
+  what: 三行代码长出一栋能住人的楼,并当场体检;或只要一间房,看它的五块区域与坐在里面的人
+  code: |
+    // 从零到一栋能住人的楼:三行
+    import { assemble, auditCity } from './engine/index.mjs';
+    const b = assemble({ seed: '客厅母模板', levels: 4, bays: 3 });
+    console.log(b.stats);            // { rooms:15, items:175, actors:57, distinctFn:14, blockedPaths:0 }
+    console.log(auditCity(b).ok);    // true = 层带/相邻/对外比例全部满足
+
+    // 只要一间房(不要整栋):功能 → 五块区域 → 套件 → 人
+    import { planRoom, castRoom, auditRoom } from './engine/index.mjs';
+    const p = planRoom('living', { seed: 42, program: 'wall' });   // 布置程序:靠墙沙发
+    console.log(p.zones.roles.main);      // 主区那块矩形(米)
+    console.log(p.items[0]);              // { kit:'sofa_3', cat:'seat', zone:'main', box:{x,z,w,d}, h }
+    console.log(auditRoom(p).ok);         // true = 没越界、没挡路、没跨类乱放
+    const c = castRoom(p, 42);
+    console.log(c.actors[0]);             // { state:'sit', body:'sit_soft', act:'sit_sofa', x, z, dir }
+selftest: node tests/engine_check.mjs && node tests/ground_check.mjs && node tests/skin_check.mjs
+docs:
+- web/terminal/cosmopolis/engine/SCHEMA.md
+- https://dannyling111.github.io/a129-cosmopolis/
