@@ -50,10 +50,21 @@ for (const dev of DEVICES) {
     ok(st.city === true, '社区规则在页面里也是全绿');
   }
 
+  // 🔴 人到底有没有踩在地板上(在真页面、真渲染之后量,不是单元测试里量)
+  const gr = await page.evaluate(() => window.__COSMO__.groundReport());
+  ok(gr.total > 0, `场景里有 ${gr.total} 个人可量`);
+  ok(gr.floating === 0, `没有人浮在空中(离楼板 >10cm 的:${gr.floating} 个)`, `最差 ${gr.worst.toFixed(3)}m @${gr.worstWho}`);
+  ok(gr.sunken === 0, `没有人陷进楼板(低于楼板 12cm 的:${gr.sunken} 个)`);
+  ok(Math.abs(gr.worst) <= 0.10, `最离谱的那个人也只差 ${gr.worst.toFixed(3)}m`, gr.worstWho);
+
+  // 🔴 主席要"鲜艳 + 细节多":这两条把它变成可判的数
+  ok(gr.meshes >= 1200, `画面里有 ${gr.meshes} 个部件(色块版只有几百个)`, String(gr.meshes));
+  ok(gr.colors >= 60, `用到 ${gr.colors} 种不同颜色(灰调版只有十几种)`, String(gr.colors));
+
   // 画面不是黑的 / 不是白的
   const buf = await page.screenshot();
   const png = buf.length;
-  ok(png > 25000, '画面有内容(截图 ' + (png / 1024 | 0) + ' KB,黑屏白屏会小得多)');
+  ok(png > 40000, '画面有内容(截图 ' + (png / 1024 | 0) + ' KB,黑屏白屏会小得多)');
 
   // 触摸目标:每个按钮 ≥44px 且【中心点命中它自己】
   const btns = await page.$$('button');

@@ -64,8 +64,12 @@ export function assemble(o = {}) {
       const w = bayW[b];
       const prev = rooms.length ? rooms[rooms.length - 1].fn : null;
       // noSameNeighbor:同一个功能不许紧挨自己(指引开篇批评的「像复制粘贴」)
-      let cands = pool.filter(f => !prev || (!AVOID.has(pairKey(prev, f.id)) &&
-                                             !(ADJACENCY.noSameNeighbor && f.id === prev)));
+      // 三层放宽:先要"整层都不重复",不够就退到"至少别紧挨着一样的",再不够才随便挑。
+      // 屋顶层带只有 4 个功能,开 5 间时必然要重复 —— 那时也要保证重复的两间【不并排】。
+      const usedOnFloor = new Set(rooms.map(r => r.fn));
+      const okAdj = f => !prev || (!AVOID.has(pairKey(prev, f.id)) && !(ADJACENCY.noSameNeighbor && f.id === prev));
+      let cands = pool.filter(f => okAdj(f) && !(ADJACENCY.noRepeatOnFloor && usedOnFloor.has(f.id)));
+      if (!cands.length) cands = pool.filter(okAdj);
       if (!cands.length) cands = pool.slice();
       // 层带的对外比例:地面层至少三分之二临街对外
       const needPublic = (rule.publicMin || 0) > 0 &&
@@ -126,6 +130,7 @@ export function auditCity(b) {
   b.floors.forEach(f => {
     const rule = BAND_RULES[f.band] || {};
     const banned = new Set((ADJACENCY.banned && ADJACENCY.banned[f.band]) || []);
+    const choices = poolFor(f.band).length;      // 这一层带到底有几个功能可挑(判"是不是本来就有得选")
     f.rooms.forEach((r, i) => {
       if (banned.has(r.fn)) bad.push(`L${f.level}(${f.band}) 出现了明令禁止的 ${r.cn}`);
       if (!(BY_ID[r.fn].bands || []).includes(f.band)) bad.push(`L${f.level} 的 ${r.cn} 不该出现在 ${f.band} 层带`);
@@ -138,6 +143,12 @@ export function auditCity(b) {
           bad.push(`L${f.level}: 两间${r.cn}并排(同一功能紧挨自己 = 指引说的「像复制粘贴」)`);
       }
     });
+    // 「同一层不许出现两间一样的」只有在【本来就有得选】的时候才算违规:
+    // 屋顶层带一共只有 4 个功能,开间开到 5 间时必然要重复一间 —— 那是数据的下限,不是抽房间抽懒了。
+    if (ADJACENCY.noRepeatOnFloor && choices >= f.rooms.length) {
+      const seen = new Set();
+      f.rooms.forEach(r => { if (seen.has(r.fn)) bad.push(`L${f.level}: 同一层出现两间${r.cn}(该层带有 ${choices} 个功能可选,却挑了重复的)`); seen.add(r.fn); });
+    }
     if (rule.publicMin > 0) {
       const share = f.rooms.filter(r => r.public).length / f.rooms.length;
       if (share + 1e-9 < rule.publicMin) bad.push(`L${f.level}(${f.band}) 对外比例 ${(share * 100) | 0}% < 要求的 ${(rule.publicMin * 100) | 0}%`);

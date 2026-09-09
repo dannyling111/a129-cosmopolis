@@ -7,12 +7,14 @@ import { assemble, auditCity } from '../engine/building.mjs';
 import { COSMOPOLIS_VERSION } from '../engine/index.mjs';
 import { auditRoom, CAT_BY_ID, FN_BY_ID, candidates } from '../engine/room.mjs';
 import { KIT_CATS, KITS } from '../engine/kits.mjs';
+import { KIT_BY_ID } from '../engine/room.mjs';
 import { FUNCTIONS, FN_FAMILIES } from '../engine/functions.mjs';
 import { SCRIPTS } from '../engine/people.mjs';
 import { BAND_RULES, ADJACENCY } from '../engine/city.mjs';
 import { ROLE_CN, ROLE_IDS, PROGRAM_CN, PROGRAMS } from '../engine/zones.mjs';
 import { stepActors } from '../engine/actors.mjs';
-import { createStage, orbit, buildRoom, buildStreet, syncPeople, syncStreet, CAT_COLOR, ZONE_COLOR } from './render3d.mjs';
+import { createStage, orbit, buildRoom, buildStreet, buildBillboard, syncPeople, syncStreet,
+         setKitLookup, setPropBuilder, CAT_COLOR, ZONE_COLOR } from './render3d.mjs';
 import { drawPlan, hitZone } from './plan2d.mjs';
 
 const $ = s => document.querySelector(s);
@@ -20,10 +22,16 @@ const hex = n => '#' + n.toString(16).padStart(6, '0');
 const BAND_CN = { ground: '地面 · 开店', mid: '中层 · 住人', top: '顶层 · 安静', roof: '屋顶 · 社交' };
 const FAM_CN = Object.fromEntries(FN_FAMILIES.map(f => [f.id, f.cn]));
 
+setKitLookup(KIT_BY_ID);          // 渲染层要知道每件家具多高(人坐多高由家具决定)
+// 家具造型包:装上就长出多部件家具,装不上就退回色块 —— 不许因为它整页白屏
+try {
+  const P = await import('./props.mjs');
+  if (typeof P.buildProp === 'function') setPropBuilder(P.buildProp);
+} catch (e) { console.warn('造型包没装上,退回色块显示:', e.message); }
 const stage = createStage($('#view'));
 let B = null, roomGroups = [], street = null, sel = null, selZone = 'main', playing = true, showZones = false;
 
-const cam = orbit($('#view'), stage.camera, { onTap: pickRoom, pitch: 0.30, yaw: -0.42 });
+const cam = orbit($('#view'), stage.camera, { onTap: pickRoom, pitch: 0.22, yaw: -0.36 });
 
 function resize() {
   const c = $('#view'), r = c.parentElement.getBoundingClientRect();
@@ -45,6 +53,7 @@ function build() {
     stage.world.add(g); roomGroups.push(g);
   }));
   street = buildStreet(B); stage.world.add(street);
+  stage.world.add(buildBillboard(B));      // 侧墙大广告牌(参考图里那块)
   stage.world.position.x = -B.width / 2;
 
   fitAll();
@@ -204,7 +213,8 @@ $('#tFit').addEventListener('click', fitAll);
 function fitAll() {
   if (!B) return;
   const hTot = (B.levels + 1) * B.floorH;
-  cam.fit(new THREE.Vector3(0, hTot * 0.46, B.depth * 0.35), B.width + 7, hTot + 6);
+  // 贴近一点:主席要看清房间里的细节,楼太小等于白做
+  cam.fit(new THREE.Vector3(0, hTot * 0.52, B.depth * 0.28), B.width + 1.0, hTot + 1.0, 1.02);
 }
 
 // ---------------- 主循环 ----------------
@@ -223,4 +233,37 @@ function loop(now) {
 // 版本印:线上是哪一版,打开控制台或看体检页就知道,不靠猜(Rule-ONESITE-001)
 console.log('COSMOPOLIS v' + COSMOPOLIS_VERSION);
 resize(); build(); requestAnimationFrame(loop);
-window.__COSMO__ = { get building() { return B; }, assemble, auditCity, auditRoom };
+// ── 运行时探针:给机器闸用,不是给界面用 ──────────────────────────
+// 🔴 主席一眼看出「人物浮在空中」,而当时所有引擎判据都是绿的 ——
+//    因为它们判的是家具落位,没有一条在看【人的脚在哪】。这个探针就是补上那只眼睛:
+//    它在【真页面、真渲染完之后】量每个人的世界坐标最低点,和他所在那层楼板对比。
+const KITS_BY_ID = KIT_BY_ID;
+function groundReport() {
+  const out = { total: 0, floating: 0, sunken: 0, worst: 0, worstWho: '', meshes: 0, colors: new Set() };
+  stage.world.traverse(o => { if (o.isMesh) { out.meshes++; if (o.material && o.material.color) out.colors.add(o.material.color.getHex()); } });
+  roomGroups.forEach(g => {
+    const floorY = g.position.y;
+    const people = g.userData.people; if (!people) return;
+    people.children.forEach(f => {
+      const a = f.userData.actor;
+      if (a.kind !== 'person') return;
+      f.updateMatrixWorld(true);
+      const bb = new THREE.Box3().setFromObject(f);
+      // 🔴 判据要认"他站/坐在什么上面",不能一律拿楼板量:
+      //    躺在床上的人本来就该高出楼板一个床垫的高度,拿楼板量他会被误判成"浮空"。
+      //    所以躺姿的参照面是那件床的高度,其余姿态(站/走/坐)的参照面才是楼板 ——
+      //    坐姿也是楼板,因为脚必须踩到地(坐面高只抬胯,不抬人)。
+      const kit = a.home && KITS_BY_ID[a.home.kit];
+      const expect = a.body === 'lie' ? Math.min(0.75, Math.max(0.25, kit ? kit.h : 0.5)) : 0;
+      const d = bb.min.y - floorY - expect;
+      out.total++;
+      if (d > 0.12) out.floating++;
+      if (d < -0.12) out.sunken++;
+      if (Math.abs(d) > Math.abs(out.worst)) { out.worst = d; out.worstWho = `${g.userData.room.cn}/${a.body}`; }
+    });
+  });
+  return { ...out, colors: out.colors.size };
+}
+
+window.__COSMO__ = { get building() { return B; }, assemble, auditCity, auditRoom, groundReport };
+window.__CLIPPROBE__ = groundReport;   // 全仓穿模闸的通用契约名

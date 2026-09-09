@@ -26,6 +26,10 @@ export const BAND_RULES = {
 //    assemble() 抽房间时过滤,auditCity() 判红,两边用同一个开关。
 export const ADJACENCY = {
   noSameNeighbor: true,
+  // 同一层里同一个功能最多出现一次。noSameNeighbor 只拦"紧挨着",
+  // 但一层三间里第 1 间和第 3 间都是信箱间,看上去照样是复制粘贴 —— 主席给的参考图里
+  // 一层从来不会出现两间一样的房。
+  noRepeatOnFloor: true,
   avoid: [
     // 🔴 指引原话「两间厨房不要并排」——第一版整套规则里一条含 kitchen 的自对都没有,
     //    独立验收实测 9000 对相邻里犯了 18 次,而体检每一栋都判绿。这三对是补上的。
