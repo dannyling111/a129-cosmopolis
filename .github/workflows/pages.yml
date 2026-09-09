@@ -3,10 +3,26 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+
+# 🔴 为什么改成官方 Actions 部署(2026-09-09):
+#   原来只用 peaceiris 把仓库根镜像到 gh-pages 分支。实测:13:25 那次 push 之后
+#   gh-pages 分支确实更新到了新版(API 查得到 studio.html),但线上仍然停在 09:54 那一版
+#   ——也就是说这个仓库的 Pages【没有在跟 gh-pages 分支】,镜像了也不会上线。
+#   更早那次官方部署失败的原因是 configure-pages 用了 enablement: false 而当时 Pages 还没开通,
+#   所以这里把它改成 true:由工作流自己开通并配置成「用 Actions 构建」,不再依赖仓库设置里那个开关。
+#   gh-pages 镜像仍然保留(与其它 a129 仓库一致、也当一份可直接看的快照),但它不再是上线路径。
+
 permissions:
   contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
-  mirror:
+  mirror:                      # 保留:把仓库根镜像一份到 gh-pages 分支(快照/沿用旧约定)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,3 +33,26 @@ jobs:
           publish_branch: gh-pages
           force_orphan: true
           exclude_assets: '.github,.github/**'
+
+  deploy:                      # 真正上线的这一条
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 备好要发的目录(排掉 .git/.github,其余整份发)
+        run: |
+          mkdir -p _site
+          rsync -a --exclude '.git' --exclude '.github' --exclude '_site' ./ _site/
+          test -f _site/index.html && test -f _site/studio.html
+          test -f _site/engine/index.mjs && test -f _site/vendor/three.module.js
+          echo "将要发布的文件数: $(find _site -type f | wc -l)"
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true     # 🔴 关键:Pages 没开通时自己开通,并配置成用 Actions 构建
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
