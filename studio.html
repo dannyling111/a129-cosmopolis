@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>CosmoPolis · 量化引擎沙盘</title>
+<meta name="description" content="五层量化真跑一遍:社区→功能→区域→套件→人物。点一间房看它的五块区域,点一块区域看它允许什么、人在里面干什么。" />
+<meta name="theme-color" content="#efe8db" />
+<link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+<div class="app">
+  <header class="bar">
+    <div class="name">CosmoPolis<small>量化引擎沙盘</small></div>
+    <input id="seed" class="seed" value="客厅母模板" spellcheck="false" maxlength="40" aria-label="种子" />
+    <button id="build" class="primary">重建</button>
+    <a href="./index.html" style="text-decoration:none"><button title="回工作指引">指引</button></a>
+  </header>
+
+  <main class="stage">
+    <canvas id="view"></canvas>
+    <div class="hud" aria-live="polite">
+      <span class="chip"><b id="hudTitle">正在生成…</b></span>
+      <span class="chip" id="hudStat"></span>
+      <span class="chip" id="hudPick">点一间房看它的五块区域</span>
+    </div>
+    <div class="tools">
+      <button id="tZone" aria-pressed="false">区域</button>
+      <button id="tPlay" aria-pressed="true">暂停</button>
+      <button id="tFit">全景</button>
+    </div>
+  </main>
+
+  <section class="sheet">
+    <div class="skinbar" aria-label="画风">
+      <div class="skinrow" id="skinRow"></div>
+      <div class="skinrow" id="timeRow"><small id="skinNote"></small></div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button data-tab="city" aria-pressed="true">社区</button>
+      <button data-tab="room" aria-pressed="false">房</button>
+      <button data-tab="zone" aria-pressed="false">区域</button>
+      <button data-tab="people" aria-pressed="false">人物</button>
+      <button data-tab="audit" aria-pressed="false">体检</button>
+    </nav>
+    <div class="pane" id="pane-city"></div>
+    <div class="pane" id="pane-room" hidden></div>
+    <div class="pane" id="pane-zone" hidden></div>
+    <div class="pane" id="pane-people" hidden></div>
+    <div class="pane" id="pane-audit" hidden></div>
+  </section>
+</div>
+<script type="module" src="./view/app.mjs"></script>
+</body>
+</html>

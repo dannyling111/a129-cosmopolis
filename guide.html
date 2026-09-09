@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CosmoPolis · 量化引擎工作指引</title>
+  <meta name="description" content="A129 独立仓库网页。积木城市的量化设计引擎：先定功能，再切区域，再拼套件，人物按场景互动。客厅是母模板。" />
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #efe8db;
+      --surface: #fbf6ec;
+      --surface-2: #efe6d4;
+      --fg: #1b1814;
+      --muted: #6f675c;
+      --faint: #9a9186;
+      --accent: #0f7f7c;
+      --accent-fg: #f7f4ec;
+      --ink: #16130f;
+      --line: #ddd4c4;
+      --display: "Fraunces", ui-serif, Georgia, serif;
+      --sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+      --radius: 16px;
+      --shadow: 0 10px 40px rgba(22, 19, 15, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--sans);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+    header.top {
+      position: sticky; top: 0; z-index: 20;
+      background: color-mix(in oklab, var(--surface) 88%, transparent);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--line);
+    }
+    .top-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; }
+    .brand { font-family: var(--display); font-size: 1.35rem; letter-spacing: -0.03em; }
+    .brand span { display: block; font-family: var(--sans); font-size: 11px; color: var(--muted); letter-spacing: 0.04em; margin-top: 2px; }
+    nav.toc { display: flex; gap: 4px; flex-wrap: wrap; }
+    nav.toc a {
+      color: var(--fg); font-size: 12px; padding: 6px 10px; border-radius: 999px;
+      background: transparent; text-decoration: none;
+    }
+    nav.toc a:hover, nav.toc a.on { background: var(--ink); color: var(--accent-fg); }
+    .hero { padding: 56px 0 28px; }
+    h1 { font-family: var(--display); font-size: clamp(2.1rem, 4vw, 3.4rem); line-height: 1.12; letter-spacing: -0.03em; margin: 0 0 16px; font-weight: 600; }
+    .lede { font-size: 1.05rem; color: var(--muted); max-width: 62ch; margin: 0; }
+    .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+    .pill { font-size: 12px; padding: 6px 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); }
+    section { padding: 42px 0; border-top: 1px solid var(--line); }
+    h2 { font-family: var(--display); font-size: 1.7rem; margin: 0 0 8px; letter-spacing: -0.03em; }
+    h3 { font-size: 0.92rem; margin: 22px 0 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+    p.sec { color: var(--muted); max-width: 68ch; margin: 0 0 22px; }
+    .layers { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+    .layer {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 14px;
+      min-height: 148px;
+    }
+    .layer b { display: block; font-family: var(--display); font-size: 1.35rem; letter-spacing: -0.03em; }
+    .layer small { display: block; color: var(--muted); font-size: 12px; margin: 6px 0 10px; }
+    .layer p { margin: 0; font-size: 13px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+    .card h4 { margin: 0 0 8px; font-size: 15px; }
+    .card p, .card li { font-size: 13px; color: var(--fg); }
+    .card ul { margin: 0; padding-left: 1.1em; }
+    .fam { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden; }
+    .fam summary {
+      cursor: pointer; list-style: none; padding: 14px 16px; font-weight: 600; display: flex; justify-content: space-between; gap: 12px;
+    }
+    .fam summary::-webkit-details-marker { display: none; }
+    .fam summary em { font-style: normal; color: var(--muted); font-weight: 400; font-size: 12px; }
+    .fam .body { padding: 0 16px 16px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { font-size: 12px; padding: 5px 10px; border-radius: 8px; background: var(--surface-2); }
+    .now { outline: 1px dashed color-mix(in oklab, var(--accent) 55%, var(--line)); }
+    .kit-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+    .kit-head span { font-size: 11px; color: var(--muted); }
+    .plan-wrap { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 16px; align-items: start; }
+    .plan {
+      background: #e7d7c2; border-radius: 16px; padding: 12px; display: grid;
+      grid-template-columns: 28% 1fr 30%;
+      grid-template-rows: 20% 1fr 24%;
+      min-height: 420px; gap: 8px;
+      border: 1px solid var(--line);
+    }
+    .zone {
+      border: 1px solid color-mix(in oklab, var(--ink) 18%, transparent);
+      border-radius: 10px; background: color-mix(in oklab, var(--surface) 70%, transparent);
+      padding: 10px; cursor: pointer; font-size: 12px; display: flex; flex-direction: column; justify-content: space-between;
+      transition: background 150ms cubic-bezier(0.22, 1, 0.36, 1), transform 150ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .zone:hover { background: var(--surface); }
+    .zone.active { background: var(--ink); color: var(--accent-fg); border-color: var(--ink); }
+    .zone.active small { color: color-mix(in oklab, var(--accent-fg) 70%, transparent); }
+    .zone small { color: var(--muted); }
+    .z-win { grid-column: 1 / -1; }
+    .z-circ { grid-column: 1 / -1; }
+    .prog { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+    .prog button {
+      font: inherit; font-size: 12px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px; cursor: pointer;
+    }
+    .prog button.on { background: var(--ink); color: var(--accent-fg); border-color: var(--ink); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 500; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+    .steps { counter-reset: step; display: grid; gap: 10px; }
+    .step { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px 14px 54px; position: relative; }
+    .step::before {
+      counter-increment: step; content: counter(step);
+      position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 50%;
+      background: var(--ink); color: var(--accent-fg); display: grid; place-items: center; font-size: 12px;
+    }
+    footer { padding: 28px 0 48px; color: var(--muted); font-size: 13px; }
+    @media (max-width: 860px) {
+      .layers, .grid-2, .grid-3, .plan-wrap { grid-template-columns: 1fr; }
+      .plan { min-height: 360px; }
+      nav.toc { display: none; }
+      h1 { font-size: 2rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .zone { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-inner">
+      <div class="brand">CosmoPolis<span>A129 · 量化引擎工作指引</span></div>
+      <nav class="toc">
+        <a href="#layers">五层</a>
+        <a href="#functions">功能</a>
+        <a href="#kits">套件</a>
+        <a href="#living">客厅母模板</a>
+        <a href="#people">人物</a>
+        <a href="#city">社区</a>
+        <a href="#clone">复制</a>
+        <a href="#phases">顺序</a>
+        <a href="./studio.html" style="color:var(--accent);font-weight:600">沙盘 ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="hero">
+      <h1>先定功能，再切区域，<br />再把零件自由组合。</h1>
+      <p class="lede">
+        积木城市不是「往房间里扔家具」。量化引擎是一套模板：社区决定这一格干什么，功能决定大区域，套件在区域内组合，人物按场景坐、走、忙。客厅是母模板，其它房间都从它克隆。
+      </p>
+      <div class="pills" id="live-pills">
+        <span class="pill">正在读引擎…</span>
+      </div>
+      <p style="margin:18px 0 0">
+        <a href="./studio.html" style="display:inline-flex;align-items:center;gap:10px;min-height:48px;padding:0 22px;
+           background:var(--accent);color:var(--accent-fg);border-radius:14px;font-weight:600;text-decoration:none">
+          打开量化沙盘 · 真跑一遍五层 →
+        </a>
+      </p>
+      <p class="lede" style="font-size:14px;color:var(--muted);margin-top:10px">
+        这一版不只是指引：五层已经写成可运行的引擎，本页下面每一张表的数字，都是从引擎里读出来的，不是手写的。
+      </p>
+    </div>
+
+    <section id="layers">
+      <h2>五层量化，不许跳级</h2>
+      <p class="sec">升级前的引擎只有两段：整栋抽房间，房间再微扰家具。缺的中间三层——区域、套件、人物脚本——现在都补上了。生成一间房必须按这个顺序走，代码里也拦住了：从功能直接跳到一张沙发坐标这条路已经不存在。</p>
+      <div class="layers">
+        <article class="layer">
+          <b>0</b><small>社区 / 楼</small>
+          <p>地面开店，中层住人，屋顶社交。街道、路灯、行人是社区，不是装饰。</p>
+        </article>
+        <article class="layer">
+          <b>1</b><small>功能</small>
+          <p>这一格是客厅还是咖啡，先锁死。功能决定能出现哪些区域，不能出现哪些套件。</p>
+        </article>
+        <article class="layer">
+          <b>2</b><small>区域</small>
+          <p>一间房切成 4–6 块：窗墙、主区、辅区、墙装、通行。家具只落在自己的块里。</p>
+        </article>
+        <article class="layer">
+          <b>3</b><small>套件</small>
+          <p>区域内从大类里抽零件自由组合。沙发换贵妃榻，仍是座具套件，布局语法不变。</p>
+        </article>
+        <article class="layer">
+          <b>4</b><small>人物</small>
+          <p>每个功能绑定一组互动：谁坐哪、谁走哪、谁不许穿过餐桌。人是引擎的输出，不是后贴的小人。</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="functions">
+      <h2>功能从 14 种扩到 48 种</h2>
+      <p class="sec">
+        升级前只有起居、卧室、厨房、咖啡、烘焙、书库、工作室、店铺、屋顶、温室、游戏、客房、梳妆、办公 —— 太粗，同一功能的房间看起来像复制粘贴。现在按社区生活切成六族共 48 个功能，全部已在引擎里跑通（下面每个名字都是从引擎读出来的）。不灌水到 140 个空名字——组合量来自「功能 × 区域程序 × 套件 × 人物」，不是靠堆功能名。
+      </p>
+      <div class="grid-2" id="fn-list"></div>
+    </section>
+
+    <section id="kits">
+      <h2>套件 12 大类，<span id="kitcount">…</span> 个零件</h2>
+      <p class="sec">
+        升级前家具是一张扁列表：沙发、椅子、床、灯……引擎不知道「这是座具还是灯」。现在大类先定、零件后抽：同类可互换，跨类不能乱放（落地灯不许进餐桌区，灶不许进卧室主区）——这条是机器拦的，故意把灶塞进窗墙区，体检会当场判红。
+      </p>
+      <div class="grid-3" id="kit-list"></div>
+    </section>
+
+    <section id="living">
+      <h2>客厅母模板</h2>
+      <p class="sec">先把客厅做对，其它房间不重新发明语法，只替换每个区域里的套件族。下面这张图是静态说明；要看引擎真排出来的平面、真长出来的人，去<a href="./studio.html">量化沙盘</a>点任意一间房的「区域」页。</p>
+      <div class="prog" id="programs"></div>
+      <div class="plan-wrap">
+        <div>
+          <div class="plan" id="plan"></div>
+        </div>
+        <aside class="card" id="zone-detail">
+          <h4>点一个区域</h4>
+          <p>窗墙、围坐、阅读角、媒介墙、通行，五块把一间客厅说完。</p>
+        </aside>
+      </div>
+    </section>
+
+    <section id="people">
+      <h2>人物是套件，不是装饰</h2>
+      <p class="sec">每个功能带一份人物脚本。座位从家具口袋里长出来（椅面、沙发坐垫、凳面），走路只走通行区。会客可以坐一会儿再起来走；吃饭的人坐死在餐椅上。</p>
+      <div class="grid-2">
+        <article class="card">
+          <h4>三种身体</h4>
+          <ul>
+            <li>坐：按座具口袋，沙发沉进去，餐椅 Leg 成 L，高凳垂腿</li>
+            <li>走：沿通行区的种子路径，碰实体绕开</li>
+            <li>忙：厨/吧附近两三点来回，不穿越客座</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h4>功能绑定</h4>
+          <ul>
+            <li>客厅：主坐沙发闲谈，辅坐阅读，一人窗前或走动，猫在毯上</li>
+            <li>厨房：一人灶前忙，一到两人餐桌进食，禁止沙发脚本</li>
+            <li>咖啡：吧后服务，凳上坐客，卡座两人，过道走动</li>
+            <li>卧室：床沿坐或站衣柜，夜间少走动</li>
+            <li>书房：书桌读，椅上坐，书架间慢走</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="city">
+      <h2>整栋是社区，不是叠盒子</h2>
+      <p class="sec">有趣来自邻里关系：底商、楼上住户、屋顶的人互相看得见。量化引擎在抽房间时就要用社区规则，而不是抽完再装饰。</p>
+      <div class="grid-3">
+        <article class="card">
+          <h4>层带</h4>
+          <p>地面：店、咖啡、烘焙、门厅，至少三分之二是对外的。中层：住与起居。顶层：安静的书、卧、工作室。屋顶：露台、烧烤、花园，不许把厨房搬上去。</p>
+        </article>
+        <article class="card">
+          <h4>相邻</h4>
+          <p>两间厨房不要并排。咖啡可以挨着烘焙。客厅愿意挨着书房。酒店客房成条，不跟儿童房对门。屋顶三开间可以混花园 / 餐 / 吧。</p>
+        </article>
+        <article class="card">
+          <h4>街道</h4>
+          <p>楼前是社区的一层：行人、路灯、树、花坛。晚上路灯亮，窗里才显得有人。楼不是悬浮的剖面模型。</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="clone">
+      <h2>客厅语法，复制到其它房间</h2>
+      <p class="sec">五个区域角色不变：窗墙、主区、辅区、墙装、通行。换套件族，就换了功能。这是引擎要落地的「模板」——先写死客厅，再复制。</p>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>区域角色</th><th>客厅</th><th>卧室</th><th>厨房</th><th>咖啡</th><th>书房</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>窗墙</td><td>窗 + 花箱 + 帘</td><td>窗 + 床头画</td><td>窗 + 花箱</td><td>橱窗 / 黑板</td><td>高书架或高窗</td></tr>
+            <tr><td>主区</td><td>围坐沙发 + 茶几</td><td>床</td><td>餐桌</td><td>卡座 / 客桌</td><td>书桌</td></tr>
+            <tr><td>辅区</td><td>阅读椅 + 落地灯</td><td>衣柜 / 梳妆</td><td>灶台操作带</td><td>吧台 + 凳</td><td>阅读椅</td></tr>
+            <tr><td>墙装</td><td>电视或架子</td><td>镜子 / 唱片</td><td>冰箱墙</td><td>吧墙 / 招牌</td><td>书墙</td></tr>
+            <tr><td>通行</td><td>留空 + 角植</td><td>床尾毯</td><td>灶前空档</td><td>过道</td><td>书架间走道</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="phases">
+      <h2>落地顺序</h2>
+      <p class="sec">第 0–4 步已经全部落进代码，每一步都挂着一条机器判据（<code>tests/engine_check.mjs</code>，负控先证明它会红，再看它是不是绿）。</p>
+      <div class="steps">
+        <div class="step"><strong>0 · 工作指引</strong> ✅<br />本页。功能、区域、套件、人物、社区规则写成同一套语言；现在本页的数字直接读引擎，不再手写第二份。</div>
+        <div class="step"><strong>1 · 客厅模板进引擎</strong> ✅<br /><code>planRoom()</code> 按五区落套件，不再整房抖动。四套布置程序只改区域角色的位置与大小，零件尺寸一个不动。</div>
+        <div class="step"><strong>2 · 克隆 48 间</strong> ✅<br />不止四间：48 个功能共用同一张区域角色表，只换套件族与人物脚本。判据：48 × 5 个种子 = 240 间房逐间过体检。</div>
+        <div class="step"><strong>3 · 套件库扩容</strong> ✅<br />12 大类按指引原名建库；碰撞盒和座位口袋跟着零件走，不跟房间走。人是从家具自带的口袋里长出来的。</div>
+        <div class="step"><strong>4 · 社区规则</strong> ✅<br />层带、相邻、对外比例、街道行人写进 <code>assemble()</code>，在<b>抽房间的时候</b>生效。判据：20 个种子各抽一栋楼逐条核。</div>
+        <div class="step"><strong>5 · 家具与人物成型</strong> ✅<br />零件不再是色块：193 件各有多部件造型；人物骨架原点落到脚底，坐姿按椅面高度反解小腿角。判据：<code>tests/ground_check.mjs</code> 逐人量脚底离地。</div>
+        <div class="step"><strong>6 · 画风融合</strong> ✅<br />把首页那版<b>剖楼玩偶屋</b>的画风接进来：整栋按一座<b>城市皮肤</b>收敛配色、面向观众那一面<b>整面剖开</b>不再隔玻璃、楼板与竖柱把房间绑成一栋楼、白天／黄昏／夜晚三态。判据：<code>tests/skin_check.mjs</code>（统一到什么程度、还分不分得出房间、六座城是不是真不一样、墙地会不会糊，每条都配了坏样本先证明它会红）。</div>
+        <div class="step" style="border-color:var(--accent)"><strong>下一步 · 还没做的</strong><br />楼与楼之间还没连成街区；家具还是纯色面，没有木纹布纹书脊这类<b>材质</b>；室内没有真正的间接光（现在靠环境光近似）。</div>
+      </div>
+    </section>
+
+    <section id="fusion">
+      <h2>两个版本，怎么合的</h2>
+      <p class="sec">这个仓库里同时躺着两版 CosmoPolis：首页是另一个窗口做的<b>剖楼玩偶屋</b>（房间是手工摆的，一间一间调出来的，好看在<b>画风</b>）；本页背后是<b>量化引擎</b>（房间是算出来的，给个种子就能长出无穷多间，强在<b>规模与可验收</b>）。两边的短板正好是对方的长板，所以合的不是页面，是分工——</p>
+      <div class="grid-2">
+        <div class="card"><strong>数据层还是引擎的</strong><p class="sec">社区规则 → 功能 → 区域 → 套件 → 人物，五层一层不跳，全部由 <code>engine/</code> 算。画风层一个布局字节都碰不到，所以换城市、换时段，房间的排布分毫不动。</p></div>
+        <div class="card"><strong>画风层是那一版的</strong><p class="sec">大面积的墙压进一座城市的色相窄带（整栋像一栋楼），小面积的强调色几乎不动（每间房还有性格）；地板强制比墙暗一档；剖面整面敞开；楼板＋竖柱＋山墙＋顶檐把房间绑成建筑；三个时段换四盏灯与曝光，零重建。</p></div>
+      </div>
+      <p class="sec">一句话：<b>它管好看，我管长得出来。</b>合完之后同一个种子能在六座城市 × 三个时段里各活一遍，而每一版都还过得了同一套体检。</p>
+    </section>
+
+    <footer>
+      CosmoPolis · A129 独立仓库网页 · 量化积木城市工作指引 <span id="ver"></span>
+      · <a href="https://github.com/dannyling111/a129-cosmopolis">仓库</a>
+    </footer>
+  </main>
+
+  <script type="module">
+    // 🔴 这一页不再自己存一份功能表/套件表 —— 全部从引擎读。
+    // 两份真理源必然会漂:指引说 120 件、引擎里是别的数,而谁都不会发现。
+    import { FUNCTIONS, FN_FAMILIES } from './engine/functions.mjs';
+    import { KITS as ENGINE_KITS, KIT_CATS } from './engine/kits.mjs';
+    import { PROGRAMS as ENGINE_PROGRAMS, ZONE_ROLES } from './engine/zones.mjs';
+
+    const FAM_NOW = { dwell:'起居 / 卧 / 客 / 梳妆', make:'书库 / 办公 / 工作室', cook:'厨房 / 咖啡 / 烘焙',
+                      shop:'店铺 / 花店', gather:'游戏 / 屋顶 / 温室', service:'无' };
+    const FNS = FN_FAMILIES.map(f => ({
+      id: f.id, name: f.cn, n: String(FUNCTIONS.filter(x => x.fam === f.id).length),
+      now: FAM_NOW[f.id] || '—',
+      items: FUNCTIONS.filter(x => x.fam === f.id).map(x => x.cn),
+    }));
+    const KITS = KIT_CATS.map(c => ({
+      name: c.cn,
+      items: ENGINE_KITS.filter(k => k.cat === c.id).map(k => k.cn),
+    }));
+    const PROGRAMS = ENGINE_PROGRAMS.map((p, i) => ({ id: i, name: p.cn, hint: p.hint }));
+
+    document.getElementById('live-pills').innerHTML = [
+      `引擎已落地：${FUNCTIONS.length} 种功能 · ${FN_FAMILIES.length} 族`,
+      `套件库：${KIT_CATS.length} 大类 · ${ENGINE_KITS.length} 件`,
+      `布置程序 ${ENGINE_PROGRAMS.length} 套 · 区域角色 ${ZONE_ROLES.length} 个`,
+      `本页数字实时读引擎，不是手写`,
+    ].map(t => `<span class="pill">${t}</span>`).join('');
+
+    import('./engine/index.mjs').then(m => {
+      document.getElementById('ver').textContent = '· 引擎 v' + m.COSMOPOLIS_VERSION;
+      // 这个数也读引擎:上一版这里手写「约 120」,而下面那颗 pill 已经是 193,两个数打架
+      const kc = document.getElementById('kitcount'); if (kc) kc.textContent = String(ENGINE_KITS.length);
+      console.log('COSMOPOLIS v' + m.COSMOPOLIS_VERSION);
+    });
+
+    const ZONES = [
+      { id: "win", name: "窗墙", cls: "z-win", kits: "窗、花箱、帘、窗下暖气或矮柜", people: "可站一人望街，不设座", role: "建筑 + 绿植 + 织物" },
+      { id: "media", name: "媒介墙", cls: "", kits: "电视或通高架、画、唱片、落地灯避开主区", people: "不坐在这里，只经过", role: "媒介 + 收纳" },
+      { id: "lounge", name: "围坐主区", cls: "", kits: "沙发、茶几、地毯、靠垫。座具口袋朝向茶几", people: "一到两人坐沙发闲谈，可起身再坐回", role: "座具 + 桌案 + 织物" },
+      { id: "read", name: "阅读辅区", cls: "", kits: "扶手椅、边几、落地灯、一小盆绿植", people: "一人坐着读，面向主区或窗", role: "座具 + 灯具" },
+      { id: "circ", name: "通行", cls: "z-circ", kits: "角植、偶尔猫。禁止大餐桌、禁止落地灯插在路中间", people: "走动只走这一带，路径绕开主区和辅区", role: "空 + 绿植 + 人物走位" },
+    ];
+
+    const fnBox = document.getElementById("fn-list");
+    FNS.forEach((f) => {
+      const d = document.createElement("details");
+      d.className = "fam";
+      d.open = f.id === "dwell";
+      d.innerHTML = `<summary>${f.name} · ${f.items.length} 个功能 <em>升级前只有：${f.now}</em></summary><div class="body">${f.items.map((x) => `<span class="chip now">${x}</span>`).join("")}</div>`;
+      fnBox.appendChild(d);
+    });
+
+    const kitBox = document.getElementById("kit-list");
+    KITS.forEach((k) => {
+      const el = document.createElement("article");
+      el.className = "card";
+      el.innerHTML = `<div class="kit-head"><h4>${k.name}</h4><span>${k.items.length} 件</span></div><div class="body" style="display:flex;flex-wrap:wrap;gap:6px">${k.items.map((x) => `<span class="chip">${x}</span>`).join("")}</div>`;
+      kitBox.appendChild(el);
+    });
+
+    const plan = document.getElementById("plan");
+    const detail = document.getElementById("zone-detail");
+    const prog = document.getElementById("programs");
+    let activeProg = 0;
+    let activeZone = "lounge";
+
+    function renderPrograms() {
+      prog.innerHTML = PROGRAMS.map((p) => `<button type="button" class="${p.id===activeProg?"on":""}" data-p="${p.id}">${p.name}</button>`).join("");
+      prog.querySelectorAll("button").forEach((b) => b.onclick = () => { activeProg = +b.dataset.p; renderPrograms(); renderPlan(); renderDetail(); });
+    }
+    function renderPlan() {
+      plan.innerHTML = ZONES.map((z) => `<button type="button" class="zone ${z.cls} ${z.id===activeZone?"active":""}" data-z="${z.id}"><strong>${z.name}</strong><small>${z.role}</small></button>`).join("");
+      plan.querySelectorAll(".zone").forEach((b) => b.onclick = () => { activeZone = b.dataset.z; renderPlan(); renderDetail(); });
+    }
+    function renderDetail() {
+      const z = ZONES.find((x) => x.id === activeZone);
+      const p = PROGRAMS[activeProg];
+      detail.innerHTML = `<h4>${z.name}</h4><p style="color:var(--muted);font-size:12px;margin:0 0 10px">布置程序：${p.name}。${p.hint}</p><p><strong>套件</strong> · ${z.kits}</p><p><strong>人物</strong> · ${z.people}</p><p style="color:var(--muted);font-size:12px;margin:12px 0 0">规则：零件只能落在自己的区域。碰撞和座位口袋跟零件走，不跟房间走。</p>`;
+    }
+    renderPrograms(); renderPlan(); renderDetail();
+  </script>
+</body>
+</html>
